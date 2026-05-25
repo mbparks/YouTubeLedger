@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Ledger — Green Shoe Garage Data Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#f1eee1; --paper-2:#e6e2cf; --ink:#1c2018; --ink-soft:#4c5142;
+    --rule:#bcc1a3; --accent:#2e7d4f; --accent-deep:#1c5733;
+    --teal:#2f6d6b; --brass:#b07a2e; --brass-deep:#785018; --bar:#34402f; --bar-soft:#9aa37b;
+    --up:#2e7d4f; --down:#a23b22; --flat:#6f6a4f;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{background:var(--paper);background-image:radial-gradient(rgba(28,32,24,.025) 1px, transparent 1px);background-size:4px 4px;color:var(--ink);font-family:"Fraunces",Georgia,serif;-webkit-font-smoothing:antialiased;line-height:1.45;}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 26px 80px;}
+  header.mast{border-bottom:3px double var(--ink);padding-bottom:18px;margin-bottom:6px;}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent-deep);margin:0 0 8px;}
+  h1{font-size:clamp(40px,8vw,80px);font-weight:900;line-height:.92;margin:0;letter-spacing:-.02em;font-optical-sizing:auto;}
+  h1 em{font-style:italic;font-weight:500;color:var(--accent);}
+  .sub{font-size:16px;color:var(--ink-soft);margin:12px 0 0;max-width:62ch;font-style:italic;}
+  .filing{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:10px;}
+  .console{border:1.5px solid var(--ink);background:linear-gradient(180deg,var(--paper-2),var(--paper));padding:22px 22px 20px;margin:28px 0;box-shadow:5px 5px 0 rgba(28,32,24,.12);}
+  .console h2{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.22em;text-transform:uppercase;margin:0 0 16px;color:var(--accent-deep);display:flex;align-items:center;gap:10px;}
+  .console h2::before{content:"";width:9px;height:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 0 3px rgba(46,125,79,.22);}
+  .field{margin-bottom:14px;}
+  label{display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:5px;}
+  input[type=text],input[type=password],input[type=number]{width:100%;background:var(--paper);border:1.5px solid var(--rule);border-radius:0;padding:11px 12px;font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--ink);transition:border-color .15s,box-shadow .15s;}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+  .row{display:flex;gap:14px;flex-wrap:wrap;} .row .field{flex:1;min-width:230px;}
+  .help{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin-top:5px;line-height:1.5;} .help a{color:var(--teal);}
+  button.go{appearance:none;cursor:pointer;border:none;background:var(--accent);color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:13px 26px;margin-top:4px;box-shadow:3px 3px 0 var(--accent-deep);transition:transform .08s,box-shadow .08s;}
+  button.go:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--accent-deep);}
+  button.go:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--accent-deep);}
+  button.go:disabled{background:var(--bar-soft);box-shadow:3px 3px 0 #8a9170;cursor:wait;}
+  .status{font-family:"IBM Plex Mono",monospace;font-size:12px;margin-top:14px;min-height:18px;color:var(--ink-soft);}
+  .status.err{color:var(--down);font-weight:600;}
+  #results{display:none;}
+  .channel-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1.5px solid var(--ink);padding-bottom:8px;margin:38px 0 0;}
+  .channel-head .name{font-size:30px;font-weight:900;letter-spacing:-.01em;} .channel-head .id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);}
+  .toolbar{display:flex;justify-content:flex-end;margin-top:12px;}
+  .tabs{display:flex;gap:0;margin:14px 0 0;border-bottom:1.5px solid var(--ink);flex-wrap:wrap;}
+  .tabs button{appearance:none;border:1.5px solid var(--ink);border-bottom:none;background:var(--paper-2);cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;padding:11px 20px;color:var(--ink-soft);margin-right:6px;position:relative;top:1.5px;}
+  .tabs button.active{background:var(--paper);color:var(--ink);font-weight:600;border-bottom:1.5px solid var(--paper);}
+  .pane{display:none;padding-top:26px;} .pane.active{display:block;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0;border:1.5px solid var(--ink);margin:0 0 30px;}
+  .stat{padding:16px 18px;border-right:1px solid var(--rule);} .stat:last-child{border-right:none;}
+  .stat .lab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);}
+  .stat .val{font-family:"IBM Plex Mono",monospace;font-size:23px;font-weight:600;margin-top:4px;letter-spacing:-.01em;}
+  .stat .val.accent{color:var(--accent);} .stat .val.brass{color:var(--brass-deep);} .stat .val.neg{color:var(--down);}
+  .verdict{border:1.5px solid var(--ink);box-shadow:5px 5px 0 rgba(28,32,24,.12);padding:24px;margin-bottom:28px;display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;}
+  .verdict .arrow{font-size:54px;line-height:1;font-weight:900;}
+  .verdict.up .arrow{color:var(--up);} .verdict.down .arrow{color:var(--down);} .verdict.flat .arrow{color:var(--flat);}
+  .verdict .vbody{flex:1;min-width:260px;} .verdict .vhead{font-size:28px;font-weight:900;letter-spacing:-.01em;margin:0 0 6px;}
+  .verdict.up .vhead{color:var(--up);} .verdict.down .vhead{color:var(--down);} .verdict.flat .vhead{color:var(--flat);}
+  .verdict p{margin:0 0 8px;font-size:15px;color:var(--ink);max-width:64ch;} .verdict .figs{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  h3.sec{font-size:22px;font-weight:600;margin:34px 0 4px;font-style:italic;}
+  .secnote{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5;max-width:74ch;}
+  .chart-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;} .chart-head h3{font-size:22px;font-weight:600;margin:0;font-style:italic;}
+  .toggle{display:inline-flex;border:1.5px solid var(--ink);}
+  .toggle button{appearance:none;border:none;background:transparent;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:8px 14px;color:var(--ink-soft);}
+  .toggle button.active{background:var(--ink);color:var(--paper);}
+  .chart-frame{border:1.5px solid var(--ink);background:rgba(255,255,255,.4);padding:14px;overflow-x:auto;}
+  .chart-scroll{height:340px;} .chart-scroll canvas{height:100%!important;}
+  .chart-fixed{height:320px;position:relative;} .chart-fixed canvas{height:100%!important;}
+
+  .econ{border:1.5px solid var(--ink);background:var(--paper-2);padding:18px;margin-bottom:24px;box-shadow:4px 4px 0 rgba(28,32,24,.1);}
+  .econ-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;}
+  .econ-field label{margin-bottom:6px;}
+  .mini-row{display:flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;}
+  .mini-row .dollar{font-size:16px;font-weight:600;} .mini-row .unit{font-size:11px;color:var(--ink-soft);}
+  .preset-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;}
+  .preset-row .preset-lab{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);}
+  .preset-row button{appearance:none;cursor:pointer;background:transparent;border:1.5px solid var(--rule);color:var(--ink-soft);font-family:"IBM Plex Mono",monospace;font-size:10.5px;padding:7px 12px;transition:.12s;}
+  .preset-row button:hover{border-color:var(--ink);color:var(--ink);}
+  .preset-row button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .badge{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.06em;background:var(--accent);color:#fff;padding:1px 5px;margin-left:6px;vertical-align:middle;border-radius:2px;}
+
+  table.mini{border-collapse:collapse;width:100%;font-family:"IBM Plex Mono",monospace;font-size:12.5px;border:1.5px solid var(--ink);margin-top:6px;}
+  table.mini th{background:var(--ink);color:var(--paper);text-align:right;padding:9px 12px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:500;} table.mini th:first-child{text-align:left;}
+  table.mini td{padding:9px 12px;border-bottom:1px solid var(--rule);text-align:right;} table.mini td:first-child{text-align:left;font-family:"Fraunces",serif;font-size:14px;}
+  table.mini tr:last-child td{border-bottom:none;} table.mini tr.recent td{background:rgba(46,125,79,.1);}
+  table.mini a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);} table.mini a:hover{color:var(--accent);}
+  td.money{color:var(--brass-deep);} td.neg{color:var(--down);}
+  .table-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:0 0 12px;} .table-head h3{font-size:22px;font-weight:600;margin:0;font-style:italic;}
+  button.csv{appearance:none;cursor:pointer;background:transparent;border:1.5px solid var(--ink);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;transition:background .12s,color .12s;}
+  button.csv:hover{background:var(--ink);color:var(--paper);}
+  .tbl-wrap{border:1.5px solid var(--ink);max-height:560px;overflow:auto;}
+  table.full{border-collapse:collapse;width:100%;font-family:"IBM Plex Mono",monospace;font-size:12.5px;}
+  table.full thead th{position:sticky;top:0;background:var(--ink);color:var(--paper);text-align:left;padding:10px 12px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:500;cursor:pointer;white-space:nowrap;}
+  table.full thead th .arr{opacity:.5;}
+  table.full tbody td{padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:top;}
+  table.full tbody tr:nth-child(even){background:rgba(28,32,24,.03);} table.full tbody tr:hover{background:rgba(46,125,79,.08);}
+  td.num{text-align:right;white-space:nowrap;} td.rank{color:var(--ink-soft);width:42px;}
+  td.title{font-family:"Fraunces",serif;font-size:14px;line-height:1.3;max-width:360px;}
+  td.title a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);} td.title a:hover{color:var(--accent);border-color:var(--accent);}
+  .top-row td{background:rgba(46,125,79,.12)!important;}
+  .snap{border:1.5px dashed var(--ink);padding:20px;margin-top:8px;background:var(--paper-2);}
+  .snap h4{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 10px;color:var(--accent-deep);}
+  .snap .btns{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .snap button,.snap label.filebtn{appearance:none;cursor:pointer;background:transparent;border:1.5px solid var(--ink);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:10px 16px;transition:background .12s,color .12s;display:inline-block;}
+  .snap button:hover,.snap label.filebtn:hover{background:var(--ink);color:var(--paper);}
+  .snap input[type=file]{display:none;} #diffOut{margin-top:16px;} .diff-head{font-size:17px;margin:0 0 10px;font-style:italic;}
+  footer{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin-top:48px;border-top:1px solid var(--rule);padding-top:14px;line-height:1.6;}
+  .priv{background:var(--paper-2);border:1px dashed var(--rule);padding:10px 13px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin-top:18px;line-height:1.6;}
+  #printSheet{display:none;}
+  @media print{
+    .wrap{display:none!important;} body{background:#fff;background-image:none;}
+    #printSheet{display:block!important;color:#1c2018;font-family:"Fraunces",Georgia,serif;}
+    @page{margin:12mm;size:portrait;}
+    #printSheet .ps-co{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#1c5733;}
+    #printSheet .ps-title{font-size:26px;font-weight:900;letter-spacing:-.01em;margin:2px 0 2px;}
+    #printSheet .ps-date{font-family:"IBM Plex Mono",monospace;font-size:10px;color:#4c5142;border-bottom:2px solid #1c2018;padding-bottom:8px;margin-bottom:12px;}
+    #printSheet .ps-verdict{border:1.5px solid #1c2018;padding:12px 14px;margin-bottom:12px;}
+    #printSheet .ps-verdict .h{font-size:18px;font-weight:900;margin:0 0 3px;}
+    #printSheet .ps-verdict.up .h{color:#2e7d4f;} #printSheet .ps-verdict.down .h{color:#a23b22;} #printSheet .ps-verdict.flat .h{color:#6f6a4f;}
+    #printSheet .ps-verdict p{margin:0;font-size:12px;}
+    #printSheet .ps-stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid #1c2018;margin-bottom:12px;}
+    #printSheet .ps-stats .s{flex:1;min-width:78px;padding:8px 9px;border-right:1px solid #bcc1a3;} #printSheet .ps-stats .s:last-child{border-right:none;}
+    #printSheet .ps-stats .l{font-family:"IBM Plex Mono",monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:#4c5142;}
+    #printSheet .ps-stats .v{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;}
+    #printSheet .ps-charts{display:flex;gap:12px;margin-bottom:12px;}
+    #printSheet figure{flex:1;margin:0;} #printSheet figure img{width:100%;border:1px solid #ccc;}
+    #printSheet figcaption{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#4c5142;margin-top:4px;}
+    #printSheet table{border-collapse:collapse;width:100%;font-family:"IBM Plex Mono",monospace;font-size:10px;border:1px solid #1c2018;}
+    #printSheet th{background:#1c2018;color:#fff;text-align:right;padding:5px 8px;font-size:8px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;} #printSheet th:first-child{text-align:left;}
+    #printSheet td{padding:5px 8px;border-bottom:1px solid #bcc1a3;text-align:right;} #printSheet td:first-child{text-align:left;}
+    #printSheet .ps-foot{font-family:"IBM Plex Mono",monospace;font-size:8px;color:#4c5142;margin-top:12px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">Green Shoe Garage Data Co. · Field Instrument No. 1</p>
+    <h1>View <em>Ledger</em></h1>
+    <p class="sub">A bench tool for tallying every upload on a YouTube channel, plotting its viewership, reading its momentum, and roughing out what it earns and clears.</p>
+    <div class="filing"><span>Powered by YouTube Data API v3</span><span id="dateStamp"></span></div>
+  </header>
+
+  <section class="console">
+    <h2>Intake</h2>
+    <div class="field">
+      <label for="key">YouTube Data API Key</label>
+      <input type="password" id="key" placeholder="AIza…" autocomplete="off" spellcheck="false">
+      <p class="help">Free from <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a> → enable "YouTube Data API v3" → Credentials → create API key. Used in your browser only; never stored or sent anywhere but Google.</p>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="chan">Channel (ID, @handle, or URL)</label>
+        <input type="text" id="chan" value="@gearsofresistance" spellcheck="false">
+        <p class="help">Pre-filled with Gears of Resistance. Swap for any channel.</p>
+      </div>
+    </div>
+    <button class="go" id="pull">Pull &amp; analyze</button>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section id="results">
+    <div class="channel-head"><span class="name" id="chName"></span><span class="id" id="chId"></span></div>
+    <div class="toolbar"><button class="csv" id="printBtn">Print one-pager</button></div>
+
+    <div class="tabs">
+      <button id="tabTrends" class="active">Trends</button>
+      <button id="tabCatalog">Catalog</button>
+      <button id="tabRevenue">Revenue &amp; profit</button>
+      <button id="tabTrack">Tracking</button>
+    </div>
+
+    <!-- ============ TRENDS ============ -->
+    <div class="pane active" id="paneTrends">
+      <div class="stats" id="stats"></div>
+      <div class="verdict" id="verdict"><div class="arrow" id="vArrow">→</div>
+        <div class="vbody"><h3 class="vhead" id="vHead"></h3><p id="vText"></p><div class="figs" id="vFigs"></div></div></div>
+      <h3 class="sec">Per-video reach over time</h3>
+      <p class="secnote">Each dot is one video, placed by publish date. The y-axis is views ÷ days online (a "views-per-day" velocity), which removes the unfair advantage older videos have from simply being up longer. Dashed line = long-run fitted trend; solid line = 3-month rolling average. Hollow dots are videos under 30 days old, shown but excluded from the trend fit.</p>
+      <div class="chart-frame"><div class="chart-fixed"><canvas id="velChart"></canvas></div></div>
+      <h3 class="sec">Reach by cohort</h3>
+      <p class="secnote">Videos split into three equal date ranges, oldest to newest, using median (robust to the occasional viral outlier). Compare the rows to see the direction of travel.</p>
+      <div id="cohortTbl"></div>
+      <h3 class="sec">Upload cadence</h3>
+      <p class="secnote">Videos published per month. Pacing often explains view swings as much as the videos themselves.</p>
+      <div class="chart-frame"><div class="chart-fixed"><canvas id="cadChart"></canvas></div></div>
+      <h3 class="sec">Engagement rate over time</h3>
+      <p class="secnote">Likes as a percentage of views, per video. The solid line is a 3-month rolling average. Rising engagement on flat views can be an early signal of a warming audience. Videos with hidden likes are skipped.</p>
+      <div class="chart-frame"><div class="chart-fixed"><canvas id="engChart"></canvas></div></div>
+    </div>
+
+    <!-- ============ CATALOG ============ -->
+    <div class="pane" id="paneCatalog">
+      <div class="chart-head"><h3>Views per video</h3>
+        <div class="toggle"><button id="sortDate" class="active">Oldest → newest</button><button id="sortViews">Most viewed</button></div></div>
+      <div class="chart-frame"><div class="chart-scroll" id="chartScroll"><canvas id="chart"></canvas></div></div>
+      <div class="table-head" style="margin-top:36px;"><h3>The full count</h3><button class="csv" id="csv">Export CSV</button></div>
+      <p class="secnote">"Est. $" is per-video estimated revenue using the RPM and Shorts cutoff set on the Revenue &amp; profit tab. The "S" badge marks a detected Short. Tap a column header to sort.</p>
+      <div class="tbl-wrap"><table class="full" id="tbl"><thead><tr>
+        <th data-k="rank">#</th><th data-k="title">Title</th>
+        <th data-k="views" class="num">Views <span class="arr">▾</span></th>
+        <th data-k="perday" class="num">Views/day</th>
+        <th data-k="dur" class="num">Len</th>
+        <th data-k="rev" class="num">Est. $</th>
+        <th data-k="likes" class="num">Likes</th>
+        <th data-k="comments" class="num">Comments</th>
+        <th data-k="date" class="num">Published</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- ============ REVENUE & PROFIT ============ -->
+    <div class="pane" id="paneRevenue">
+      <h3 class="sec" style="margin-top:6px;">Estimated revenue &amp; profit</h3>
+      <p class="secnote">Rough estimate only. Real ad earnings are private to the channel owner and never exposed publicly; this multiplies lifetime views by an assumed RPM (dollars kept per 1,000 views after YouTube's cut). Shorts are detected by duration, an imperfect heuristic, and monetize at a tiny fraction of long-form, so they get their own RPM. Costs are whatever you enter, so profit is only as good as your numbers. Excludes sponsorships, memberships, merch, and affiliate income.</p>
+      <div class="econ">
+        <div class="econ-grid">
+          <div class="econ-field"><label>Long-form RPM ($/1k views)</label><div class="mini-row"><span class="dollar">$</span><input type="number" id="rpmLong" value="3.00" min="0" step="0.25"></div></div>
+          <div class="econ-field"><label>Shorts RPM ($/1k views)</label><div class="mini-row"><span class="dollar">$</span><input type="number" id="rpmShort" value="0.10" min="0" step="0.05"></div></div>
+          <div class="econ-field"><label>Shorts cutoff (duration ≤)</label><div class="mini-row"><input type="number" id="shortMax" value="60" min="0" step="1"><span class="unit">sec</span></div></div>
+          <div class="econ-field"><label>Cost per long-form video</label><div class="mini-row"><span class="dollar">$</span><input type="number" id="costLong" value="0" min="0" step="10"></div></div>
+          <div class="econ-field"><label>Cost per Short</label><div class="mini-row"><span class="dollar">$</span><input type="number" id="costShort" value="0" min="0" step="5"></div></div>
+        </div>
+        <div class="preset-row"><span class="preset-lab">Long-form RPM presets:</span>
+          <button data-rpml="1">$1</button><button data-rpml="3" class="active">$3</button><button data-rpml="8">$8</button><button data-rpml="15">$15</button></div>
+      </div>
+      <div class="stats" id="revStats"></div>
+      <p class="secnote" id="revBreak" style="margin-top:-16px;"></p>
+      <h3 class="sec">Estimated revenue by year published</h3>
+      <p class="secnote">Long-form vs Shorts, stacked. Each video's full lifetime estimate is attributed to the year it went up, so older years keep climbing; read it as "which vintage of content earns most," not "what was made that calendar year."</p>
+      <div class="chart-frame"><div class="chart-fixed"><canvas id="revChart"></canvas></div></div>
+      <h3 class="sec">Per-video economics (top by profit)</h3>
+      <p class="secnote">Top earners after costs. Full per-video revenue, cost, and profit are in the CSV export on the Catalog tab.</p>
+      <div id="econTbl"></div>
+    </div>
+
+    <!-- ============ TRACKING ============ -->
+    <div class="pane" id="paneTrack">
+      <h3 class="sec" style="margin-top:6px;">True longitudinal tracking</h3>
+      <p class="secnote">The API only hands back lifetime totals and the current subscriber count as they stand right now, so a single pull can't show real history. To track actual growth, save a snapshot today, come back later, pull again, and load the old snapshot here. The tool computes views and subscribers gained, the daily rates, the marginal subscribers each new video brought in, and which videos moved most.</p>
+      <div class="snap"><h4>Snapshot</h4>
+        <div class="btns"><button id="saveSnap">Save snapshot (.json)</button>
+          <label class="filebtn">Compare a saved snapshot<input type="file" id="loadSnap" accept=".json,application/json"></label></div>
+        <div id="diffOut"></div></div>
+    </div>
+
+    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed). Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
+  </section>
+
+  <footer>View Ledger v5 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
+</div>
+<div id="printSheet"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = new Intl.NumberFormat('en-US');
+const fmt1 = new Intl.NumberFormat('en-US',{maximumFractionDigits:1});
+const compact = new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1});
+const usd0 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const usd2 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});
+const usdC = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',notation:'compact',maximumFractionDigits:1});
+const DAY = 86400000;
+function money(n){const a=Math.abs(n);const s=a>=100000?usdC.format(a):a<100?usd2.format(a):usd0.format(a);return n<0?'-'+s:s;}
+$('dateStamp').textContent='Compiled '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+
+let VIDEOS=[], CH_NAME='', CH_ID='', CH_SUBS=null;
+let CHART=null, VEL=null, CAD=null, ENG=null, REV=null;
+let SORT_MODE='date', TBL_SORT={k:'views',dir:-1}, trendsDrawn=false, revDrawn=false;
+let RPM_LONG=3, RPM_SHORT=0.10, SHORT_MAX=60, COST_LONG=0, COST_SHORT=0;
+const API='https://www.googleapis.com/youtube/v3/';
+
+function setStatus(m,err){const s=$('status');s.textContent=m;s.className='status'+(err?' err':'');}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function daysOnline(d){return Math.max((Date.now()-new Date(d).getTime())/DAY,.5);}
+function median(a){if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function mean(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
+function parseDur(iso){const m=/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/.exec(iso||'');if(!m)return 0;return (+m[1]||0)*3600+(+m[2]||0)*60+Math.round(+m[3]||0);}
+function fmtDur(s){if(!s)return '—';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h?h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0'):m+':'+String(sec).padStart(2,'0');}
+function isShort(v){return v.dur>0 && v.dur<=SHORT_MAX;}
+function revOf(v){return v.views*(isShort(v)?RPM_SHORT:RPM_LONG)/1000;}
+function costOf(v){return isShort(v)?COST_SHORT:COST_LONG;}
+function profitOf(v){return revOf(v)-costOf(v);}
+
+async function api(path){
+  const r=await fetch(API+path); const j=await r.json();
+  if(!r.ok){
+    const reason=j.error?.errors?.[0]?.reason||''; const detail=j.error?.message||('HTTP '+r.status);
+    if(reason==='quotaExceeded') throw new Error('API quota exceeded for today. Try tomorrow or use another key.');
+    if(reason==='keyInvalid'||r.status===400) throw new Error('That API key looks invalid. Check it and that YouTube Data API v3 is enabled. ('+detail+')');
+    if(reason==='ipRefererBlocked') throw new Error('This key is restricted and is blocking the request. Use an unrestricted key, or allow this referrer in Google Cloud.');
+    throw new Error(detail);
+  }
+  return j;
+}
+
+async function resolveChannelId(input,key){
+  input=input.trim();
+  const idM=input.match(/UC[\w-]{22}/);
+  if(idM&&(input===idM[0]||input.includes('/channel/'))) return idM[0];
+  let handle=null; const h=input.match(/@([\w.\-]+)/);
+  if(h) handle=h[1]; else if(!input.includes('/')&&!/^UC[\w-]{22}$/.test(input)&&input) handle=input.replace(/^@/,'');
+  if(handle){const j=await api(`channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${key}`);
+    if(j.items&&j.items.length) return j.items[0].id; throw new Error('No channel found for handle @'+handle+'.');}
+  if(idM) return idM[0];
+  throw new Error('Could not read a channel ID, @handle, or URL from that input.');
+}
+
+async function run(){
+  const key=$('key').value.trim(), chan=$('chan').value.trim();
+  if(!key){setStatus('Enter your YouTube Data API key first.',true);return;}
+  if(!chan){setStatus('Enter a channel.',true);return;}
+  $('pull').disabled=true; $('results').style.display='none';
+  try{
+    setStatus('Resolving channel…');
+    const channelId=await resolveChannelId(chan,key);
+    setStatus('Reading channel record…');
+    const ch=await api(`channels?part=snippet,contentDetails,statistics&id=${channelId}&key=${key}`);
+    if(!ch.items||!ch.items.length) throw new Error('Channel not found.');
+    const c=ch.items[0]; const uploads=c.contentDetails.relatedPlaylists.uploads;
+    CH_NAME=c.snippet.title; CH_ID=channelId;
+    CH_SUBS=c.statistics.hiddenSubscriberCount?null:(c.statistics.subscriberCount!=null?+c.statistics.subscriberCount:null);
+
+    let ids=[],token='',page=0;
+    do{
+      const j=await api(`playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50${token?'&pageToken='+token:''}&key=${key}`);
+      (j.items||[]).forEach(it=>ids.push(it.contentDetails.videoId));
+      token=j.nextPageToken||''; page++;
+      setStatus(`Indexing uploads… ${ids.length} videos found`);
+    } while(token&&page<200);
+    if(!ids.length) throw new Error('This channel has no public videos.');
+
+    VIDEOS=[];
+    for(let i=0;i<ids.length;i+=50){
+      const chunk=ids.slice(i,i+50);
+      const j=await api(`videos?part=snippet,statistics,contentDetails&id=${chunk.join(',')}&key=${key}`);
+      (j.items||[]).forEach(v=>{
+        const views=+(v.statistics.viewCount||0);
+        VIDEOS.push({id:v.id,title:v.snippet.title,date:v.snippet.publishedAt,views,
+          dur:parseDur(v.contentDetails&&v.contentDetails.duration),
+          likes:v.statistics.likeCount!=null?+v.statistics.likeCount:null,
+          comments:v.statistics.commentCount!=null?+v.statistics.commentCount:null,
+          perday:views/daysOnline(v.snippet.publishedAt)});
+      });
+      setStatus(`Tallying views… ${VIDEOS.length}/${ids.length}`);
+    }
+    VIDEOS.sort((a,b)=>new Date(a.date)-new Date(b.date));
+    setStatus(`Done — ${VIDEOS.length} videos counted.`);
+    trendsDrawn=false; revDrawn=false; render();
+  }catch(e){ setStatus(e.message||String(e),true); }
+  finally{ $('pull').disabled=false; }
+}
+
+function render(){
+  $('chName').textContent=CH_NAME; $('chId').textContent=CH_ID;
+  const views=VIDEOS.map(v=>v.views), total=views.reduce((a,b)=>a+b,0);
+  const last90=VIDEOS.filter(v=>daysOnline(v.date)<=90).length;
+  const newest=VIDEOS[VIDEOS.length-1];
+  const subsPer=CH_SUBS!=null?fmt.format(Math.round(CH_SUBS/VIDEOS.length)):'—';
+  $('stats').innerHTML=[
+    ['Videos',fmt.format(VIDEOS.length),''],
+    ['Subscribers',CH_SUBS!=null?compact.format(CH_SUBS):'hidden','accent'],
+    ['Subs / video',subsPer,'accent'],
+    ['Total views',compact.format(total),''],
+    ['Median views',compact.format(median(views)),''],
+    ['Last 90 days',fmt.format(last90)+' vids',''],
+    ['Newest',new Date(newest.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}),'']
+  ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
+  computeVerdict(); drawChart(); buildTable();
+  showTab('trends');
+  $('results').style.display='block'; $('results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function computeVerdict(){
+  const matured=VIDEOS.filter(v=>daysOnline(v.date)>=30);
+  const set=matured.length>=6?matured:VIDEOS;
+  const n=set.length, third=Math.max(1,Math.floor(n/3));
+  const oldC=set.slice(0,third), newC=set.slice(n-third);
+  const oldVel=median(oldC.map(v=>v.perday)), newVel=median(newC.map(v=>v.perday));
+  const oldViews=median(oldC.map(v=>v.views)), newViews=median(newC.map(v=>v.views));
+  const pct=oldVel>0?(newVel-oldVel)/oldVel*100:0;
+  const el=$('verdict'); let cls,head,arrow;
+  if(pct>15){cls='up';head='Gaining momentum';arrow='↗';}
+  else if(pct<-15){cls='down';head='Cooling off';arrow='↘';}
+  else{cls='flat';head='Holding steady';arrow='→';}
+  el.className='verdict '+cls; $('vArrow').textContent=arrow; $('vHead').textContent=head;
+  const dir=pct>=0?'up':'down';
+  $('vText').innerHTML=`Measured by views-per-day, the channel's recent videos are pulling <strong>${fmt1.format(Math.abs(pct))}% ${dir}</strong> against its earliest cohort. Newest videos average <strong>${fmt.format(Math.round(newVel))}</strong> views/day versus <strong>${fmt.format(Math.round(oldVel))}</strong> for the oldest.`;
+  $('vFigs').textContent=`cohort size ${third} videos each · median lifetime views ${compact.format(oldViews)} (old) → ${compact.format(newViews)} (new) · ${matured.length<6?'small catalog: using all videos':'videos under 30 days excluded from this read'}`;
+}
+
+function rollingLine(items){
+  const pts=items.filter(p=>isFinite(p.y)).sort((a,b)=>a.t-b.t);
+  if(pts.length<3)return [];
+  const WIN=90*DAY, STEP=30.4*DAY, first=pts[0].t, last=pts[pts.length-1].t; let out=[];
+  for(let t=first+WIN;t<=last+STEP;t+=STEP){const tc=Math.min(t,last);const win=pts.filter(p=>p.t>tc-WIN&&p.t<=tc);if(win.length) out.push({x:tc,y:mean(win.map(p=>p.y))});}
+  return out;
+}
+
+function drawChart(){
+  const data=SORT_MODE==='views'?[...VIDEOS].sort((a,b)=>b.views-a.views):VIDEOS;
+  const maxV=Math.max(...data.map(v=>v.views));
+  const colors=data.map(v=>v.views===maxV?'rgba(46,125,79,.92)':'rgba(52,64,47,.78)');
+  const scroll=$('chartScroll'); scroll.style.width=Math.max(scroll.parentElement.clientWidth-30,data.length*16)+'px';
+  const showTicks=data.length<=28;
+  if(CHART)CHART.destroy();
+  CHART=new Chart($('chart'),{type:'bar',
+    data:{labels:data.map(v=>SORT_MODE==='date'?new Date(v.date).toLocaleDateString('en-US',{month:'short',year:'2-digit'}):v.title),
+      datasets:[{data:data.map(v=>v.views),backgroundColor:colors,borderColor:'rgba(28,32,24,.35)',borderWidth:.5,maxBarThickness:46}]},
+    options:{maintainAspectRatio:false,responsive:true,animation:{duration:380},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2018',titleColor:'#f1eee1',bodyColor:'#f1eee1',titleFont:{family:'Fraunces',size:13},bodyFont:{family:'IBM Plex Mono',size:11.5},padding:11,displayColors:false,
+        callbacks:{title:i=>data[i[0].dataIndex].title,label:i=>{const v=data[i.dataIndex];return [fmt.format(v.views)+' views'+(isShort(v)?' · Short':''),money(revOf(v))+' est.',new Date(v.date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})];}}}},
+      scales:{x:{ticks:{display:showTicks,font:{family:'IBM Plex Mono',size:9},color:'#4c5142',maxRotation:90,minRotation:45,autoSkip:false},grid:{display:false}},
+        y:{ticks:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142',callback:v=>compact.format(v)},grid:{color:'rgba(28,32,24,.08)'}}}}});
+}
+
+function drawTrends(){ drawVelocity(); drawCadence(); drawEngagement(); buildCohort(); trendsDrawn=true; }
+
+function drawVelocity(){
+  const matured=VIDEOS.filter(v=>daysOnline(v.date)>=30&&v.perday>0);
+  const young=VIDEOS.filter(v=>!(daysOnline(v.date)>=30)&&v.perday>0);
+  const ptsM=matured.map(v=>({x:new Date(v.date).getTime(),y:v.perday,title:v.title}));
+  const ptsY=young.map(v=>({x:new Date(v.date).getTime(),y:v.perday,title:v.title}));
+  let trend=[];
+  if(matured.length>=3){
+    const xs=matured.map(v=>new Date(v.date).getTime()), ys=matured.map(v=>Math.log10(v.perday));
+    const n=xs.length, mx=mean(xs), my=mean(ys); let sxy=0,sxx=0;
+    for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)**2;}
+    const b=sxx?sxy/sxx:0, a=my-b*mx, x0=Math.min(...xs), x1=Math.max(...xs);
+    trend=[{x:x0,y:Math.pow(10,a+b*x0)},{x:x1,y:Math.pow(10,a+b*x1)}];
+  }
+  const roll=rollingLine(VIDEOS.filter(v=>v.perday>0).map(v=>({t:new Date(v.date).getTime(),y:v.perday})));
+  if(VEL)VEL.destroy();
+  VEL=new Chart($('velChart'),{type:'scatter',
+    data:{datasets:[
+      {label:'matured',data:ptsM,backgroundColor:'rgba(52,64,47,.65)',pointRadius:4,pointHoverRadius:6},
+      {label:'under 30d',data:ptsY,backgroundColor:'rgba(0,0,0,0)',borderColor:'rgba(46,125,79,.9)',borderWidth:1.5,pointRadius:4,pointHoverRadius:6},
+      {label:'Long-run trend',type:'line',data:trend,borderColor:'rgba(28,87,51,.9)',borderWidth:2.4,borderDash:[6,4],pointRadius:0,pointHoverRadius:0,fill:false},
+      {label:'3-mo rolling avg',type:'line',data:roll,borderColor:'rgba(47,109,107,.95)',borderWidth:2.4,pointRadius:0,pointHoverRadius:0,tension:.25,fill:false}
+    ]},
+    options:{maintainAspectRatio:false,responsive:true,interaction:{intersect:true,mode:'nearest'},
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142',boxWidth:22,boxHeight:0,filter:item=>item.text==='Long-run trend'||item.text==='3-mo rolling avg'}},
+        tooltip:{backgroundColor:'#1c2018',titleColor:'#f1eee1',bodyColor:'#f1eee1',titleFont:{family:'Fraunces',size:13},bodyFont:{family:'IBM Plex Mono',size:11.5},padding:11,displayColors:false,
+          callbacks:{title:i=>i[0].raw.title||'',label:i=>i.raw.title?[fmt.format(Math.round(i.raw.y))+' views/day','published '+new Date(i.raw.x).toLocaleDateString('en-US',{month:'short',year:'numeric'})]:''}}},
+      scales:{x:{type:'linear',ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>new Date(v).toLocaleDateString('en-US',{month:'short',year:'2-digit'})},grid:{display:false}},
+        y:{type:'logarithmic',title:{display:true,text:'views / day (log)',font:{family:'IBM Plex Mono',size:10},color:'#4c5142'},ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>compact.format(v)},grid:{color:'rgba(28,32,24,.08)'}}}}});
+}
+
+function drawCadence(){
+  const map=new Map();
+  VIDEOS.forEach(v=>{const d=new Date(v.date);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');map.set(k,(map.get(k)||0)+1);});
+  const keys=[...map.keys()].sort(); let labels=[],vals=[];
+  if(keys.length){let [sy,sm]=keys[0].split('-').map(Number),[ey,em]=keys[keys.length-1].split('-').map(Number);let y=sy,m=sm;
+    while(y<ey||(y===ey&&m<=em)){const k=y+'-'+String(m).padStart(2,'0');labels.push(k);vals.push(map.get(k)||0);m++;if(m>12){m=1;y++;}}}
+  if(CAD)CAD.destroy();
+  CAD=new Chart($('cadChart'),{type:'bar',
+    data:{labels:labels.map(k=>{const[y,m]=k.split('-');return new Date(y,m-1).toLocaleDateString('en-US',{month:'short',year:'2-digit'});}),
+      datasets:[{data:vals,backgroundColor:'rgba(47,109,107,.78)',maxBarThickness:30}]},
+    options:{maintainAspectRatio:false,responsive:true,plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'#1c2018',bodyColor:'#f1eee1',bodyFont:{family:'IBM Plex Mono',size:11.5},padding:10,displayColors:false,callbacks:{label:i=>i.raw+' video'+(i.raw===1?'':'s')}}},
+      scales:{x:{ticks:{font:{family:'IBM Plex Mono',size:8.5},color:'#4c5142',maxRotation:90,minRotation:60,autoSkip:true,maxTicksLimit:24},grid:{display:false}},
+        y:{beginAtZero:true,ticks:{stepSize:1,font:{family:'IBM Plex Mono',size:10},color:'#4c5142'},grid:{color:'rgba(28,32,24,.08)'}}}}});
+}
+
+function drawEngagement(){
+  const pts=VIDEOS.filter(v=>v.likes!=null&&v.views>0).map(v=>({x:new Date(v.date).getTime(),y:v.likes/v.views*100,title:v.title,likes:v.likes,views:v.views}));
+  const roll=rollingLine(pts.map(p=>({t:p.x,y:p.y})));
+  if(ENG)ENG.destroy();
+  ENG=new Chart($('engChart'),{type:'scatter',
+    data:{datasets:[
+      {label:'video',data:pts,backgroundColor:'rgba(176,122,46,.6)',pointRadius:3.5,pointHoverRadius:6},
+      {label:'3-mo rolling avg',type:'line',data:roll,borderColor:'rgba(120,80,24,.95)',borderWidth:2.4,pointRadius:0,pointHoverRadius:0,tension:.25,fill:false}
+    ]},
+    options:{maintainAspectRatio:false,responsive:true,interaction:{intersect:true,mode:'nearest'},
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142',boxWidth:22,boxHeight:0,filter:item=>item.text==='3-mo rolling avg'}},
+        tooltip:{backgroundColor:'#1c2018',titleColor:'#f1eee1',bodyColor:'#f1eee1',titleFont:{family:'Fraunces',size:13},bodyFont:{family:'IBM Plex Mono',size:11.5},padding:11,displayColors:false,
+          callbacks:{title:i=>i[0].raw.title||'',label:i=>i.raw.title?[fmt1.format(i.raw.y)+'% like rate',fmt.format(i.raw.likes)+' likes / '+compact.format(i.raw.views)+' views']:''}}},
+      scales:{x:{type:'linear',ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>new Date(v).toLocaleDateString('en-US',{month:'short',year:'2-digit'})},grid:{display:false}},
+        y:{ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>v+'%'},grid:{color:'rgba(28,32,24,.08)'}}}}});
+}
+
+function buildCohort(){
+  const n=VIDEOS.length, third=Math.max(1,Math.floor(n/3));
+  const groups=[['Oldest third',VIDEOS.slice(0,third)],['Middle third',VIDEOS.slice(third,n-third)],['Newest third',VIDEOS.slice(n-third)]].filter(g=>g[1].length);
+  const rows=groups.map(([name,g],idx)=>{
+    const lr=g.filter(v=>v.likes!=null&&v.views>0).map(v=>v.likes/v.views*100);
+    return `<tr class="${idx===groups.length-1?'recent':''}"><td>${name}</td><td>${g.length}</td>
+      <td>${compact.format(median(g.map(v=>v.views)))}</td><td>${fmt.format(Math.round(median(g.map(v=>v.perday))))}</td>
+      <td>${lr.length?fmt1.format(median(lr))+'%':'—'}</td>
+      <td>${new Date(g[0].date).toLocaleDateString('en-US',{month:'short',year:'2-digit'})}–${new Date(g[g.length-1].date).toLocaleDateString('en-US',{month:'short',year:'2-digit'})}</td></tr>`;
+  }).join('');
+  $('cohortTbl').innerHTML=`<table class="mini"><thead><tr><th>Cohort</th><th>Videos</th><th>Median views</th><th>Median views/day</th><th>Median like rate</th><th>Span</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function buildTable(){
+  const rows=[...VIDEOS].sort((a,b)=>{
+    if(TBL_SORT.k==='title'){const x=(a.title||'').toLowerCase(),y=(b.title||'').toLowerCase();return x<y?-TBL_SORT.dir:x>y?TBL_SORT.dir:0;}
+    if(TBL_SORT.k==='rank')return 0;
+    let x,y;
+    if(TBL_SORT.k==='date'){x=new Date(a.date);y=new Date(b.date);}
+    else if(TBL_SORT.k==='rev'){x=revOf(a);y=revOf(b);}
+    else {x=a[TBL_SORT.k];y=b[TBL_SORT.k];}
+    return (x-y)*TBL_SORT.dir;
+  });
+  const maxV=Math.max(...VIDEOS.map(v=>v.views));
+  $('tbl').querySelector('tbody').innerHTML=rows.map((v,i)=>`
+    <tr class="${v.views===maxV?'top-row':''}"><td class="rank">${i+1}</td>
+      <td class="title"><a href="https://youtu.be/${v.id}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a></td>
+      <td class="num">${fmt.format(v.views)}</td><td class="num">${fmt.format(Math.round(v.perday))}</td>
+      <td class="num">${fmtDur(v.dur)}${isShort(v)?'<span class="badge">S</span>':''}</td>
+      <td class="num money">${money(revOf(v))}</td>
+      <td class="num">${v.likes!=null?fmt.format(v.likes):'—'}</td><td class="num">${v.comments!=null?fmt.format(v.comments):'—'}</td>
+      <td class="num">${new Date(v.date).toLocaleDateString('en-US',{year:'numeric',month:'2-digit',day:'2-digit'})}</td></tr>`).join('');
+}
+
+/* ---------- revenue & profit ---------- */
+function readEcon(){
+  RPM_LONG=Math.max(0,parseFloat($('rpmLong').value)||0);
+  RPM_SHORT=Math.max(0,parseFloat($('rpmShort').value)||0);
+  SHORT_MAX=Math.max(0,parseFloat($('shortMax').value)||0);
+  COST_LONG=Math.max(0,parseFloat($('costLong').value)||0);
+  COST_SHORT=Math.max(0,parseFloat($('costShort').value)||0);
+}
+function renderRevenue(){
+  readEcon();
+  document.querySelectorAll('.preset-row button').forEach(b=>b.classList.toggle('active',Math.abs(parseFloat(b.dataset.rpml)-RPM_LONG)<1e-9));
+  const longV=VIDEOS.filter(v=>!isShort(v)), shortV=VIDEOS.filter(v=>isShort(v));
+  const grossLong=longV.reduce((a,v)=>a+revOf(v),0), grossShort=shortV.reduce((a,v)=>a+revOf(v),0);
+  const gross=grossLong+grossShort;
+  const cost=VIDEOS.reduce((a,v)=>a+costOf(v),0);
+  const profit=gross-cost;
+  const margin=gross>0?profit/gross*100:0;
+  $('revStats').innerHTML=[
+    ['Est. gross revenue',money(gross),'brass'],
+    ['Est. total cost',money(cost),''],
+    ['Est. net profit',money(profit),profit>=0?'accent':'neg'],
+    ['Avg profit / video',money(profit/VIDEOS.length),profit>=0?'':'neg'],
+    ['Margin',fmt1.format(margin)+'%','']
+  ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
+  $('revBreak').innerHTML=`${longV.length} long-form (est ${money(grossLong)}) · ${shortV.length} Shorts ≤${SHORT_MAX}s (est ${money(grossShort)})`;
+  drawRevChart(); buildEconTable(); buildTable();
+}
+function drawRevChart(){
+  const L=new Map(),S=new Map(),C=new Map();
+  VIDEOS.forEach(v=>{const y=new Date(v.date).getFullYear();C.set(y,(C.get(y)||0)+1);
+    if(isShort(v))S.set(y,(S.get(y)||0)+revOf(v)); else L.set(y,(L.get(y)||0)+revOf(v));});
+  const ks=[...C.keys()]; const lo=Math.min(...ks),hi=Math.max(...ks); let years=[];
+  for(let y=lo;y<=hi;y++)years.push(y);
+  if(REV)REV.destroy();
+  REV=new Chart($('revChart'),{type:'bar',
+    data:{labels:years,datasets:[
+      {label:'Long-form',data:years.map(y=>L.get(y)||0),backgroundColor:'rgba(46,125,79,.85)',stack:'rev',maxBarThickness:54},
+      {label:'Shorts',data:years.map(y=>S.get(y)||0),backgroundColor:'rgba(176,122,46,.85)',stack:'rev',maxBarThickness:54}
+    ]},
+    options:{maintainAspectRatio:false,responsive:true,
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142',boxWidth:14,boxHeight:14}},
+        tooltip:{backgroundColor:'#1c2018',titleColor:'#f1eee1',bodyColor:'#f1eee1',titleFont:{family:'IBM Plex Mono',size:12},bodyFont:{family:'IBM Plex Mono',size:11.5},padding:11,
+          callbacks:{title:i=>i[0].label,label:i=>i.dataset.label+': '+money(i.raw)+' est.',footer:i=>'Total '+money(i.reduce((a,x)=>a+x.raw,0))+' · '+(C.get(+i[0].label)||0)+' videos'}}},
+      scales:{x:{stacked:true,ticks:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142'},grid:{display:false}},
+        y:{stacked:true,beginAtZero:true,ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>usdC.format(v)},grid:{color:'rgba(28,32,24,.08)'}}}}});
+}
+function buildEconTable(){
+  const top=[...VIDEOS].sort((a,b)=>profitOf(b)-profitOf(a)).slice(0,12);
+  $('econTbl').innerHTML=`<table class="mini"><thead><tr><th>#</th><th>Video</th><th>Type</th><th>Views</th><th>Est. rev</th><th>Est. cost</th><th>Est. profit</th></tr></thead><tbody>
+    ${top.map((v,i)=>`<tr><td>${i+1}</td><td><a href="https://youtu.be/${v.id}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a></td>
+      <td>${isShort(v)?'Short':'Long'}</td><td>${fmt.format(v.views)}</td><td>${money(revOf(v))}</td><td>${money(costOf(v))}</td>
+      <td class="${profitOf(v)<0?'neg':''}">${money(profitOf(v))}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* ---------- exports ---------- */
+function exportCsv(){
+  readEcon();
+  const head=['rank','title','type','duration_sec','views','views_per_day','est_revenue_usd','est_cost_usd','est_profit_usd','likes','comments','published','url'];
+  const rows=[...VIDEOS].sort((a,b)=>b.views-a.views).map((v,i)=>[i+1,'"'+v.title.replace(/"/g,'""')+'"',isShort(v)?'short':'long',v.dur,v.views,Math.round(v.perday),revOf(v).toFixed(2),costOf(v).toFixed(2),profitOf(v).toFixed(2),v.likes??'',v.comments??'',v.date,'https://youtu.be/'+v.id].join(','));
+  download(new Blob([head.join(',')+'\n'+rows.join('\n')],{type:'text/csv'}),slug()+'_views.csv');
+}
+function saveSnapshot(){
+  const snap={channel:CH_NAME,channelId:CH_ID,takenAt:new Date().toISOString(),subscribers:CH_SUBS,videoCount:VIDEOS.length,
+    videos:VIDEOS.map(v=>({id:v.id,title:v.title,date:v.date,views:v.views,dur:v.dur,likes:v.likes,comments:v.comments}))};
+  download(new Blob([JSON.stringify(snap,null,2)],{type:'application/json'}),slug()+'_snapshot_'+new Date().toISOString().slice(0,10)+'.json');
+}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);}
+function slug(){return (CH_NAME||'channel').replace(/[^\w]+/g,'_').toLowerCase();}
+
+function compareSnapshot(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    let prev; try{prev=JSON.parse(reader.result);}catch(e){$('diffOut').innerHTML='<p class="secnote" style="color:var(--down)">That file isn\'t valid JSON.</p>';return;}
+    if(!prev.videos||!prev.takenAt){$('diffOut').innerHTML='<p class="secnote" style="color:var(--down)">That doesn\'t look like a View Ledger snapshot.</p>';return;}
+    const days=Math.max((Date.now()-new Date(prev.takenAt).getTime())/DAY,.01);
+    const prevMap=new Map(prev.videos.map(v=>[v.id,v]));
+    let totThen=0,sharedNow=0,moved=[];
+    VIDEOS.forEach(v=>{const p=prevMap.get(v.id);if(p){totThen+=p.views;sharedNow+=v.views;moved.push({title:v.title,id:v.id,gain:v.views-p.views});}});
+    const newVids=VIDEOS.filter(v=>!prevMap.has(v.id));
+    const gained=sharedNow-totThen; moved.sort((a,b)=>b.gain-a.gain); const top=moved.slice(0,8);
+    const dir=gained>=0?'up':'down';
+    const dSubs=(prev.subscribers!=null&&CH_SUBS!=null)?CH_SUBS-prev.subscribers:null;
+    const subRow=dSubs!=null
+      ? `<tr class="recent"><td>Subscribers</td><td>${fmt.format(prev.subscribers)}</td><td>${fmt.format(CH_SUBS)}</td><td>${dSubs>=0?'+':''}${fmt.format(dSubs)} (${dSubs>=0?'+':''}${fmt.format(Math.round(dSubs/days))}/day)</td></tr>`
+      : `<tr class="recent"><td>Subscribers</td><td colspan="3" style="text-align:left">not available in both snapshots</td></tr>`;
+    let marginalRow='';
+    if(dSubs!=null && newVids.length>0) marginalRow=`<tr><td>Subs per new video</td><td colspan="2" style="text-align:left">${newVids.length} new uploads</td><td>${dSubs/newVids.length>=0?'+':''}${fmt.format(Math.round(dSubs/newVids.length))} subs / video</td></tr>`;
+    $('diffOut').innerHTML=`
+      <p class="diff-head">From ${new Date(prev.takenAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})} to today (${fmt1.format(days)} days)</p>
+      <table class="mini"><thead><tr><th>Measure</th><th>Then</th><th>Now</th><th>Change</th></tr></thead><tbody>
+        <tr><td>Views (videos in both)</td><td>${fmt.format(totThen)}</td><td>${fmt.format(sharedNow)}</td><td>${gained>=0?'+':''}${fmt.format(gained)} (${gained>=0?'+':''}${fmt.format(Math.round(gained/days))}/day)</td></tr>
+        ${subRow}${marginalRow}
+        <tr><td>New videos since</td><td>—</td><td>${newVids.length}</td><td>+${fmt.format(newVids.reduce((a,v)=>a+v.views,0))} views</td></tr>
+      </tbody></table>
+      <p class="secnote" style="margin-top:14px;">Trending <strong style="color:var(--${dir==='up'?'up':'down'})">${dir}</strong> — the catalog added ${gained>=0?'about':'a net'} ${compact.format(Math.abs(gained))} views over ${fmt1.format(days)} days.</p>
+      ${top.length?`<p class="diff-head" style="margin-top:18px;">Biggest movers</p>
+      <table class="mini"><thead><tr><th>Video</th><th>Views gained</th></tr></thead><tbody>
+        ${top.map(m=>`<tr><td><a href="https://youtu.be/${m.id}" target="_blank" rel="noopener">${escapeHtml(m.title)}</a></td><td>${m.gain>=0?'+':''}${fmt.format(m.gain)}</td></tr>`).join('')}
+      </tbody></table>`:''}`;
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- print one-pager ---------- */
+function buildPrintSheet(){
+  if(!trendsDrawn) drawTrends();
+  readEcon();
+  const totalViews=VIDEOS.reduce((a,v)=>a+v.views,0);
+  const gross=VIDEOS.reduce((a,v)=>a+revOf(v),0);
+  const profit=gross-VIDEOS.reduce((a,v)=>a+costOf(v),0);
+  const vcls=$('verdict').className.replace('verdict','').trim();
+  const stats=[
+    ['Videos',fmt.format(VIDEOS.length)],
+    ['Subscribers',CH_SUBS!=null?compact.format(CH_SUBS):'hidden'],
+    ['Subs / video',CH_SUBS!=null?fmt.format(Math.round(CH_SUBS/VIDEOS.length)):'—'],
+    ['Total views',compact.format(totalViews)],
+    ['Est. revenue',money(gross)],
+    ['Est. profit',money(profit)]
+  ].map(([l,v])=>`<div class="s"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+  $('printSheet').innerHTML=`
+    <div class="ps-co">Green Shoe Garage Data Co. · View Ledger</div>
+    <div class="ps-title">${escapeHtml(CH_NAME)}</div>
+    <div class="ps-date">Momentum &amp; economics report · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})} · est. @ $${fmt1.format(RPM_LONG)}/$${fmt1.format(RPM_SHORT)} RPM</div>
+    <div class="ps-verdict ${vcls}"><div class="h">${$('vHead').textContent}</div><p>${$('vText').innerHTML}</p></div>
+    <div class="ps-stats">${stats}</div>
+    <div class="ps-charts">
+      <figure><img id="psVel"><figcaption>Per-video reach over time (views/day, log)</figcaption></figure>
+      <figure><img id="psCad"><figcaption>Upload cadence (videos/month)</figcaption></figure>
+    </div>
+    ${$('cohortTbl').innerHTML.replace('class="mini"','')}
+    <div class="ps-foot">Generated by View Ledger · data from YouTube Data API v3 · revenue, profit, and velocity are estimates, not official YouTube Analytics.</div>`;
+  try{ $('psVel').src=VEL.toBase64Image('image/png'); }catch(e){}
+  try{ $('psCad').src=CAD.toBase64Image('image/png'); }catch(e){}
+  setTimeout(()=>window.print(),120);
+}
+
+/* ---------- tabs ---------- */
+function showTab(which){
+  const map={trends:['tabTrends','paneTrends'],catalog:['tabCatalog','paneCatalog'],revenue:['tabRevenue','paneRevenue'],track:['tabTrack','paneTrack']};
+  Object.values(map).forEach(([t,p])=>{$(t).classList.remove('active');$(p).classList.remove('active');});
+  $(map[which][0]).classList.add('active'); $(map[which][1]).classList.add('active');
+  if(which==='trends'){ if(!trendsDrawn) drawTrends(); else {VEL&&VEL.resize();CAD&&CAD.resize();ENG&&ENG.resize();} }
+  if(which==='catalog'){ CHART&&CHART.resize(); }
+  if(which==='revenue'){ if(!revDrawn){renderRevenue();revDrawn=true;} else {REV&&REV.resize();} }
+}
+
+/* ---------- events ---------- */
+$('pull').addEventListener('click',run);
+$('key').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+$('chan').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+$('tabTrends').addEventListener('click',()=>showTab('trends'));
+$('tabCatalog').addEventListener('click',()=>showTab('catalog'));
+$('tabRevenue').addEventListener('click',()=>showTab('revenue'));
+$('tabTrack').addEventListener('click',()=>showTab('track'));
+$('sortDate').addEventListener('click',()=>{SORT_MODE='date';$('sortDate').classList.add('active');$('sortViews').classList.remove('active');drawChart();});
+$('sortViews').addEventListener('click',()=>{SORT_MODE='views';$('sortViews').classList.add('active');$('sortDate').classList.remove('active');drawChart();});
+$('csv').addEventListener('click',exportCsv);
+$('printBtn').addEventListener('click',buildPrintSheet);
+$('saveSnap').addEventListener('click',saveSnapshot);
+$('loadSnap').addEventListener('change',e=>{if(e.target.files[0])compareSnapshot(e.target.files[0]);});
+['rpmLong','rpmShort','shortMax','costLong','costShort'].forEach(id=>$(id).addEventListener('input',()=>{if(VIDEOS.length)renderRevenue();}));
+document.querySelectorAll('.preset-row button').forEach(b=>b.addEventListener('click',()=>{$('rpmLong').value=parseFloat(b.dataset.rpml).toFixed(2);if(VIDEOS.length)renderRevenue();}));
+$('tbl').querySelectorAll('th').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.dataset.k; if(k==='rank')return;
+    if(TBL_SORT.k===k)TBL_SORT.dir*=-1; else {TBL_SORT.k=k;TBL_SORT.dir=(k==='title')?1:-1;}
+    $('tbl').querySelectorAll('th .arr').forEach(a=>a.remove());
+    const arr=document.createElement('span');arr.className='arr';arr.textContent=TBL_SORT.dir<0?' ▾':' ▴';th.appendChild(arr);
+    buildTable();
+  });
+});
+</script>
+</body>
+</html>
