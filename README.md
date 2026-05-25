@@ -1,4 +1,4 @@
-# View Ledger
+# YouTube View Ledger
 
 A single-file, browser-based analytics tool for any public YouTube channel. Enter a free YouTube Data API key and a channel, and View Ledger pulls every public upload, charts viewership, reads the channel's momentum, and roughs out estimated revenue and profit. No build step, no server, no account.
 
