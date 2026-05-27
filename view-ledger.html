@@ -40,7 +40,8 @@
   .status{font-family:"IBM Plex Mono",monospace;font-size:12px;margin-top:14px;min-height:18px;color:var(--ink-soft);}
   .status.err{color:var(--down);font-weight:600;}
   #results{display:none;}
-  .channel-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1.5px solid var(--ink);padding-bottom:8px;margin:38px 0 0;}
+  .channel-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1.5px solid var(--ink);padding-bottom:8px;margin:38px 0 0;}
+  .channel-head #chAvatar{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--ink);object-fit:cover;}
   .channel-head .name{font-size:30px;font-weight:900;letter-spacing:-.01em;} .channel-head .id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);}
   .toolbar{display:flex;justify-content:flex-end;margin-top:12px;}
   .tabs{display:flex;gap:0;margin:14px 0 0;border-bottom:1.5px solid var(--ink);flex-wrap:wrap;}
@@ -98,6 +99,13 @@
   table.full tbody tr:nth-child(even){background:rgba(28,32,24,.03);} table.full tbody tr:hover{background:rgba(46,125,79,.08);}
   td.num{text-align:right;white-space:nowrap;} td.rank{color:var(--ink-soft);width:42px;}
   td.title{font-family:"Fraunces",serif;font-size:14px;line-height:1.3;max-width:360px;}
+  td.thumb{width:92px;padding:6px 8px;} td.thumb img{width:80px;height:45px;object-fit:cover;border:1px solid var(--rule);display:block;}
+  .badge.kids{background:var(--brass);}
+  .badge.live{background:var(--down);} .badge.ai{background:var(--teal);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1.5px solid var(--rule);background:var(--paper-2);color:var(--ink-soft);padding:5px 11px;border-radius:14px;}
+  .chip.topic{border-color:var(--teal);color:var(--teal);}
+  .chip-head{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin:14px 0 0;}
   td.title a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);} td.title a:hover{color:var(--accent);border-color:var(--accent);}
   .top-row td{background:rgba(46,125,79,.12)!important;}
   .snap{border:1.5px dashed var(--ink);padding:20px;margin-top:8px;background:var(--paper-2);}
@@ -163,12 +171,13 @@
   </section>
 
   <section id="results">
-    <div class="channel-head"><span class="name" id="chName"></span><span class="id" id="chId"></span></div>
+    <div class="channel-head"><img id="chAvatar" alt="" style="display:none"><span class="name" id="chName"></span><span class="id" id="chId"></span></div>
     <div class="toolbar"><button class="csv" id="printBtn">Print one-pager</button></div>
 
     <div class="tabs">
       <button id="tabTrends" class="active">Trends</button>
       <button id="tabCatalog">Catalog</button>
+      <button id="tabContent">Content</button>
       <button id="tabRevenue">Revenue &amp; profit</button>
       <button id="tabTrack">Tracking</button>
     </div>
@@ -201,7 +210,7 @@
       <div class="table-head" style="margin-top:36px;"><h3>The full count</h3><button class="csv" id="csv">Export CSV</button></div>
       <p class="secnote">"Est. $" is per-video estimated revenue using the RPM and Shorts cutoff set on the Revenue &amp; profit tab. The "S" badge marks a detected Short. Tap a column header to sort.</p>
       <div class="tbl-wrap"><table class="full" id="tbl"><thead><tr>
-        <th data-k="rank">#</th><th data-k="title">Title</th>
+        <th data-k="rank">#</th><th></th><th data-k="title">Title</th>
         <th data-k="views" class="num">Views <span class="arr">▾</span></th>
         <th data-k="perday" class="num">Views/day</th>
         <th data-k="dur" class="num">Len</th>
@@ -210,6 +219,35 @@
         <th data-k="comments" class="num">Comments</th>
         <th data-k="date" class="num">Published</th>
       </tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- ============ CONTENT ============ -->
+    <div class="pane" id="paneContent">
+      <h3 class="sec" style="margin-top:6px;">Channel record</h3>
+      <p class="secnote">A reconciliation of what YouTube reports for the channel against what this tool fetched from the uploads playlist. Gaps are normal: the channel's all-time total counts deleted and private videos that can't be retrieved.</p>
+      <div id="reconTbl"></div>
+
+      <h3 class="sec">Performance by content type</h3>
+      <p class="secnote">Standard uploads, Shorts (by the duration cutoff on the Revenue tab), and livestreams or premieres (anything that ran live). Each format tends to perform differently, so median views and views-per-day are split out.</p>
+      <div id="typeTbl"></div>
+
+      <h3 class="sec">Which tags pull the most views</h3>
+      <p class="secnote">Tags the uploader set, ranked by the median views of videos carrying them. Hidden on the watch page but returned by the API. Only tags used on at least 2 videos are shown, so a single viral outlier doesn't crown a one-off tag. This is correlation, not cause: a tag riding popular videos may reflect the topic, not the tag itself.</p>
+      <div class="chart-frame"><div class="chart-fixed" id="tagFrame"><canvas id="tagChart"></canvas></div></div>
+      <p class="secnote" id="tagNote" style="margin-top:12px;"></p>
+
+      <h3 class="sec">Category mix</h3>
+      <p class="secnote">YouTube's assigned category per video, with how each performs.</p>
+      <div id="catTbl"></div>
+
+      <h3 class="sec">Captions &amp; quality</h3>
+      <p class="secnote">Caption coverage is an accessibility and discoverability signal (captioned videos are searchable on their words and open to more viewers). The reach comparison is correlational.</p>
+      <div class="stats" id="capStats"></div>
+      <p class="secnote" id="capNote" style="margin-top:-16px;"></p>
+
+      <h3 class="sec">Topics &amp; keywords</h3>
+      <p class="secnote">Channel-level topic categories YouTube infers, and the channel's own keywords.</p>
+      <div id="topicWrap"></div>
     </div>
 
     <!-- ============ REVENUE & PROFIT ============ -->
@@ -226,6 +264,7 @@
         </div>
         <div class="preset-row"><span class="preset-lab">Long-form RPM presets:</span>
           <button data-rpml="1">$1</button><button data-rpml="3" class="active">$3</button><button data-rpml="8">$8</button><button data-rpml="15">$15</button></div>
+        <p class="secnote" id="rpmCountryNote" style="margin:12px 0 0;"></p>
       </div>
       <div class="stats" id="revStats"></div>
       <p class="secnote" id="revBreak" style="margin-top:-16px;"></p>
@@ -247,10 +286,10 @@
         <div id="diffOut"></div></div>
     </div>
 
-    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed). The momentum verdict checks posting cadence and recency (reading as "dormant" when a channel has gone quiet) and compares median lifetime views among matured uploads. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
+    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable, which is why the Content tab reconciles the fetched catalog against YouTube's all-time totals. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed); livestreams and premieres are detected from live timestamps and counted under the long-form RPM. Tags are uploader-set and may be sparse or absent; tag-to-views and caption-to-views figures are correlational, not causal. The country-based RPM default is a coarse geography guess. Made-for-kids videos are flagged but still estimated at full RPM, so revenue for those runs high. The momentum verdict checks posting cadence and recency (reading as "dormant" when a channel has gone quiet) and compares median lifetime views among matured uploads. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
   </section>
 
-  <footer>View Ledger v6 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
+  <footer>View Ledger v8 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
 </div>
 <div id="printSheet"></div>
 
@@ -266,9 +305,10 @@ const DAY = 86400000;
 function money(n){const a=Math.abs(n);const s=a>=100000?usdC.format(a):a<100?usd2.format(a):usd0.format(a);return n<0?'-'+s:s;}
 $('dateStamp').textContent='Compiled '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
 
-let VIDEOS=[], CH_NAME='', CH_ID='', CH_SUBS=null;
-let CHART=null, VEL=null, CAD=null, ENG=null, REV=null;
-let SORT_MODE='date', TBL_SORT={k:'views',dir:-1}, trendsDrawn=false, revDrawn=false;
+let VIDEOS=[], CH_NAME='', CH_ID='', CH_SUBS=null, CH_CREATED=null, CH_AVATAR='';
+let CH_COUNTRY='', CH_TOTAL_VIEWS=null, CH_VIDEO_COUNT=null, CH_KEYWORDS=[], CH_TOPICS=[], CAT_MAP={}, rpmTouched=false;
+let CHART=null, VEL=null, CAD=null, ENG=null, REV=null, TAG=null;
+let SORT_MODE='date', TBL_SORT={k:'views',dir:-1}, trendsDrawn=false, revDrawn=false, contentDrawn=false;
 let RPM_LONG=3, RPM_SHORT=0.10, SHORT_MAX=60, COST_LONG=0, COST_SHORT=0;
 const API='https://www.googleapis.com/youtube/v3/';
 
@@ -280,12 +320,21 @@ function mean(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
 function parseDur(iso){const m=/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/.exec(iso||'');if(!m)return 0;return (+m[1]||0)*3600+(+m[2]||0)*60+Math.round(+m[3]||0);}
 function fmtDur(s){if(!s)return '—';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h?h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0'):m+':'+String(sec).padStart(2,'0');}
 function isShort(v){return v.dur>0 && v.dur<=SHORT_MAX;}
+function vtype(v){return isShort(v)?'short':(v.live?'live':'standard');}
+function typeLabel(t){return t==='short'?'Short':t==='live'?'Livestream':'Standard';}
+function parseKeywords(s){if(!s)return [];const out=[];const re=/"([^"]+)"|(\S+)/g;let m;while((m=re.exec(s)))out.push(m[1]||m[2]);return out;}
+function topicName(url){try{const seg=decodeURIComponent(url.split('/').pop());return seg.replace(/_/g,' ');}catch(e){return null;}}
+// rough geography-based RPM tiers (long-form, USD per 1k views). Coarse starting points only.
+const RPM_T1=new Set(['US','CA','AU','GB','NZ','DE','CH','NO','DK','SE','FI','NL','BE','AT','IE','LU','IS']);
+const RPM_T2=new Set(['FR','IT','ES','JP','KR','SG','AE','IL','PT','CZ','PL','GR','TW','HK','SA','QA','KW']);
+function rpmForCountry(cc){if(!cc)return null;if(RPM_T1.has(cc))return 4;if(RPM_T2.has(cc))return 2.5;return 1.2;}
 function revOf(v){return v.views*(isShort(v)?RPM_SHORT:RPM_LONG)/1000;}
 function costOf(v){return isShort(v)?COST_SHORT:COST_LONG;}
 function profitOf(v){return revOf(v)-costOf(v);}
 function relTime(days){if(days<1)return 'today';if(days<14)return Math.round(days)+' days';if(days<60)return Math.round(days/7)+' weeks';if(days<365)return Math.round(days/30.4)+' months';return fmt1.format(days/365)+' years';}
 function cadenceStr(g){if(g==null)return 'irregularly';if(g<1.5)return 'about daily';if(g<14)return 'every '+Math.round(g)+' days';if(g<60)return 'every '+Math.round(g/7)+' weeks';if(g<400)return 'every '+Math.round(g/30.4)+' months';return 'about yearly';}
 function gapShort(g){if(g==null)return '—';if(g<14)return '~'+Math.round(g)+' days';if(g<60)return '~'+Math.round(g/7)+' wk';if(g<400)return '~'+Math.round(g/30.4)+' mo';return '~'+fmt1.format(g/365)+' yr';}
+function channelAgeYears(){return CH_CREATED?Math.max((Date.now()-new Date(CH_CREATED).getTime())/DAY/365,.01):null;}
 function activityStatus(){
   const dates=VIDEOS.map(v=>new Date(v.date).getTime()).sort((a,b)=>a-b);
   const daysSince=(Date.now()-dates[dates.length-1])/DAY;
@@ -329,11 +378,25 @@ async function run(){
     setStatus('Resolving channel…');
     const channelId=await resolveChannelId(chan,key);
     setStatus('Reading channel record…');
-    const ch=await api(`channels?part=snippet,contentDetails,statistics&id=${channelId}&key=${key}`);
+    const ch=await api(`channels?part=snippet,contentDetails,statistics,brandingSettings,topicDetails&id=${channelId}&key=${key}`);
     if(!ch.items||!ch.items.length) throw new Error('Channel not found.');
     const c=ch.items[0]; const uploads=c.contentDetails.relatedPlaylists.uploads;
     CH_NAME=c.snippet.title; CH_ID=channelId;
+    CH_CREATED=c.snippet.publishedAt||null;
+    CH_COUNTRY=c.snippet.country||'';
+    CH_AVATAR=(c.snippet.thumbnails&&(c.snippet.thumbnails.default||c.snippet.thumbnails.medium)||{}).url||'';
     CH_SUBS=c.statistics.hiddenSubscriberCount?null:(c.statistics.subscriberCount!=null?+c.statistics.subscriberCount:null);
+    CH_TOTAL_VIEWS=c.statistics.viewCount!=null?+c.statistics.viewCount:null;
+    CH_VIDEO_COUNT=c.statistics.videoCount!=null?+c.statistics.videoCount:null;
+    CH_KEYWORDS=parseKeywords(c.brandingSettings&&c.brandingSettings.channel&&c.brandingSettings.channel.keywords);
+    CH_TOPICS=((c.topicDetails&&c.topicDetails.topicCategories)||[]).map(topicName).filter(Boolean);
+    CH_TOPICS=[...new Set(CH_TOPICS)];
+    // map category ids to names (one cheap call, region-specific)
+    CAT_MAP={};
+    try{
+      const vc=await api(`videoCategories?part=snippet&regionCode=${CH_COUNTRY||'US'}&key=${key}`);
+      (vc.items||[]).forEach(it=>{CAT_MAP[it.id]=it.snippet.title;});
+    }catch(e){ /* categories will fall back to numeric ids */ }
 
     let ids=[],token='',page=0;
     do{
@@ -347,11 +410,21 @@ async function run(){
     VIDEOS=[];
     for(let i=0;i<ids.length;i+=50){
       const chunk=ids.slice(i,i+50);
-      const j=await api(`videos?part=snippet,statistics,contentDetails&id=${chunk.join(',')}&key=${key}`);
+      const j=await api(`videos?part=snippet,statistics,contentDetails,status,liveStreamingDetails&id=${chunk.join(',')}&key=${key}`);
       (j.items||[]).forEach(v=>{
         const views=+(v.statistics.viewCount||0);
+        const th=v.snippet.thumbnails||{};
+        const cd=v.contentDetails||{}, ls=v.liveStreamingDetails||null;
         VIDEOS.push({id:v.id,title:v.snippet.title,date:v.snippet.publishedAt,views,
-          dur:parseDur(v.contentDetails&&v.contentDetails.duration),
+          thumb:((th.medium||th.default||{}).url)||'',
+          kids:!!(v.status&&v.status.madeForKids),
+          synthetic:!!(v.status&&v.status.containsSyntheticMedia),
+          tags:Array.isArray(v.snippet.tags)?v.snippet.tags:[],
+          cat:v.snippet.categoryId||null,
+          caption:cd.caption==='true',
+          definition:cd.definition||'',
+          live:!!(ls&&(ls.actualStartTime||ls.actualEndTime)),
+          dur:parseDur(cd.duration),
           likes:v.statistics.likeCount!=null?+v.statistics.likeCount:null,
           comments:v.statistics.commentCount!=null?+v.statistics.commentCount:null,
           perday:views/daysOnline(v.snippet.publishedAt)});
@@ -360,26 +433,33 @@ async function run(){
     }
     VIDEOS.sort((a,b)=>new Date(a.date)-new Date(b.date));
     setStatus(`Done — ${VIDEOS.length} videos counted.`);
-    trendsDrawn=false; revDrawn=false; render();
+    trendsDrawn=false; revDrawn=false; contentDrawn=false;
+    if(!rpmTouched){const r=rpmForCountry(CH_COUNTRY); if(r!=null) $('rpmLong').value=r.toFixed(2);}
+    render();
   }catch(e){ setStatus(e.message||String(e),true); }
   finally{ $('pull').disabled=false; }
 }
 
 function render(){
   $('chName').textContent=CH_NAME; $('chId').textContent=CH_ID;
+  if(CH_AVATAR){$('chAvatar').src=CH_AVATAR;$('chAvatar').style.display='inline-block';} else $('chAvatar').style.display='none';
   const views=VIDEOS.map(v=>v.views), total=views.reduce((a,b)=>a+b,0);
   const last90=VIDEOS.filter(v=>daysOnline(v.date)<=90).length;
   const subsPer=CH_SUBS!=null?fmt.format(Math.round(CH_SUBS/VIDEOS.length)):'—';
   const act=activityStatus();
+  const ageY=channelAgeYears();
+  const kids=VIDEOS.filter(v=>v.kids).length;
   $('stats').innerHTML=[
     ['Videos',fmt.format(VIDEOS.length),''],
+    ['Channel age',ageY!=null?(ageY<1?Math.round(ageY*12)+' mo':fmt1.format(ageY)+' yr'):'—',''],
     ['Subscribers',CH_SUBS!=null?compact.format(CH_SUBS):'hidden','accent'],
     ['Subs / video',subsPer,'accent'],
     ['Total views',compact.format(total),''],
+    ['Views / year',ageY!=null?compact.format(total/ageY):'—',''],
     ['Median views',compact.format(median(views)),''],
-    ['Last 90 days',fmt.format(last90)+' vids',act.status==='dormant'?'neg':''],
     ['Cadence',gapShort(act.medGap),''],
-    ['Last upload',relTime(act.daysSince)+' ago',act.status==='dormant'?'neg':'']
+    ['Last upload',relTime(act.daysSince)+' ago',act.status==='dormant'?'neg':''],
+    ['Made for kids',kids?fmt.format(kids)+' vids':'none','']
   ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
   computeVerdict(); drawChart(); buildTable();
   showTab('trends');
@@ -539,7 +619,8 @@ function buildTable(){
   const maxV=Math.max(...VIDEOS.map(v=>v.views));
   $('tbl').querySelector('tbody').innerHTML=rows.map((v,i)=>`
     <tr class="${v.views===maxV?'top-row':''}"><td class="rank">${i+1}</td>
-      <td class="title"><a href="https://youtu.be/${v.id}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a></td>
+      <td class="thumb">${v.thumb?`<a href="https://youtu.be/${v.id}" target="_blank" rel="noopener"><img src="${v.thumb}" alt="" loading="lazy"></a>`:''}</td>
+      <td class="title"><a href="https://youtu.be/${v.id}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a>${v.live?'<span class="badge live">LIVE</span>':''}${v.kids?'<span class="badge kids">KIDS</span>':''}${v.synthetic?'<span class="badge ai">AI</span>':''}</td>
       <td class="num">${fmt.format(v.views)}</td><td class="num">${fmt.format(Math.round(v.perday))}</td>
       <td class="num">${fmtDur(v.dur)}${isShort(v)?'<span class="badge">S</span>':''}</td>
       <td class="num money">${money(revOf(v))}</td>
@@ -564,14 +645,27 @@ function renderRevenue(){
   const cost=VIDEOS.reduce((a,v)=>a+costOf(v),0);
   const profit=gross-cost;
   const margin=gross>0?profit/gross*100:0;
+  const ageY=channelAgeYears();
   $('revStats').innerHTML=[
     ['Est. gross revenue',money(gross),'brass'],
+    ['Est. revenue / year',ageY!=null?money(gross/ageY):'—',''],
     ['Est. total cost',money(cost),''],
     ['Est. net profit',money(profit),profit>=0?'accent':'neg'],
     ['Avg profit / video',money(profit/VIDEOS.length),profit>=0?'':'neg'],
     ['Margin',fmt1.format(margin)+'%','']
   ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
-  $('revBreak').innerHTML=`${longV.length} long-form (est ${money(grossLong)}) · ${shortV.length} Shorts ≤${SHORT_MAX}s (est ${money(grossShort)})`;
+  const kids=VIDEOS.filter(v=>v.kids).length;
+  const liveN=VIDEOS.filter(v=>vtype(v)==='live').length;
+  $('revBreak').innerHTML=`${longV.length} long-form (est ${money(grossLong)}) · ${shortV.length} Shorts ≤${SHORT_MAX}s (est ${money(grossShort)})`+
+    (liveN?` · ${liveN} livestream${liveN===1?'':'s'} counted under the long-form RPM`:'')+
+    (kids?` · <span style="color:var(--brass-deep)">${kids} made-for-kids video${kids===1?'':'s'} included at full RPM, though these typically earn far less (no personalized ads), so the real figure is lower</span>`:'');
+  const sug=rpmForCountry(CH_COUNTRY);
+  if(CH_COUNTRY&&sug!=null){
+    const tier=RPM_T1.has(CH_COUNTRY)?'higher-RPM':RPM_T2.has(CH_COUNTRY)?'mid-RPM':'lower-RPM';
+    $('rpmCountryNote').innerHTML=`Channel country is <strong>${CH_COUNTRY}</strong> (a ${tier} market), so the long-form RPM was pre-set to a rough <strong>$${fmt1.format(sug)}</strong>. This is a very coarse geography-based guess; adjust it to the channel's actual niche.`;
+  } else {
+    $('rpmCountryNote').innerHTML=`No channel country is set, so the default RPM is left at the generic starting point. Set it to match the channel's audience geography and niche.`;
+  }
   drawRevChart(); buildEconTable(); buildTable();
 }
 function drawRevChart(){
@@ -602,16 +696,99 @@ function buildEconTable(){
   </tbody></table>`;
 }
 
+/* ---------- content tab ---------- */
+function renderContent(){
+  buildRecon(); buildTypeTable(); drawTagChart(); buildCatTable(); buildCaptions(); buildTopics();
+  contentDrawn=true;
+}
+function buildRecon(){
+  const summed=VIDEOS.reduce((a,v)=>a+v.views,0);
+  const rows=[
+    ['Country',CH_COUNTRY||'not set',''],
+    ['Channel created',CH_CREATED?new Date(CH_CREATED).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'—',''],
+    ['Videos fetched here',fmt.format(VIDEOS.length),''],
+    ['Videos reported by YouTube',CH_VIDEO_COUNT!=null?fmt.format(CH_VIDEO_COUNT):'—',CH_VIDEO_COUNT!=null&&CH_VIDEO_COUNT!==VIDEOS.length?'diff':''],
+    ['Catalog views (summed here)',fmt.format(summed),''],
+    ['All-time views reported by YouTube',CH_TOTAL_VIEWS!=null?fmt.format(CH_TOTAL_VIEWS):'—',CH_TOTAL_VIEWS!=null&&CH_TOTAL_VIEWS>summed*1.02?'diff':'']
+  ];
+  $('reconTbl').innerHTML=`<table class="mini"><tbody>${rows.map(([l,v,c])=>`<tr${c==='diff'?' class="recent"':''}><td>${l}</td><td>${v}</td></tr>`).join('')}</tbody></table>`;
+}
+function buildTypeTable(){
+  const types=['standard','short','live'];
+  const rows=types.map(t=>{
+    const g=VIDEOS.filter(v=>vtype(v)===t); if(!g.length)return '';
+    return `<tr><td>${typeLabel(t)}</td><td>${g.length}</td><td>${compact.format(median(g.map(v=>v.views)))}</td><td>${fmt.format(Math.round(median(g.map(v=>v.perday))))}</td><td>${compact.format(g.reduce((a,v)=>a+v.views,0))}</td></tr>`;
+  }).filter(Boolean).join('');
+  $('typeTbl').innerHTML=`<table class="mini"><thead><tr><th>Type</th><th>Videos</th><th>Median views</th><th>Median views/day</th><th>Total views</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function drawTagChart(){
+  const map=new Map();
+  VIDEOS.forEach(v=>v.tags.forEach(t=>{const k=t.toLowerCase();if(!map.has(k))map.set(k,{label:t,views:[]});map.get(k).views.push(v.views);}));
+  let tags=[...map.values()].filter(t=>t.views.length>=2).map(t=>({label:t.label,n:t.views.length,med:median(t.views)}));
+  tags.sort((a,b)=>b.med-a.med); tags=tags.slice(0,12).reverse();
+  const frame=$('tagFrame');
+  if(!tags.length){ if(TAG){TAG.destroy();TAG=null;} frame.innerHTML=''; $('tagNote').textContent='This channel has no tags set on at least 2 videos, so there is nothing to rank.'; return; }
+  if(!frame.querySelector('canvas')) frame.innerHTML='<canvas id="tagChart"></canvas>';
+  frame.style.height=Math.max(220,tags.length*26+40)+'px';
+  if(TAG)TAG.destroy();
+  TAG=new Chart($('tagChart'),{type:'bar',
+    data:{labels:tags.map(t=>t.label),datasets:[{data:tags.map(t=>t.med),backgroundColor:'rgba(46,125,79,.82)',maxBarThickness:18,
+      meta:tags}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,responsive:true,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2018',titleColor:'#f1eee1',bodyColor:'#f1eee1',titleFont:{family:'IBM Plex Mono',size:12},bodyFont:{family:'IBM Plex Mono',size:11.5},padding:11,displayColors:false,
+        callbacks:{title:i=>i[0].label,label:i=>[compact.format(i.raw)+' median views',tags[i.dataIndex].n+' videos use this tag']}}},
+      scales:{x:{ticks:{font:{family:'IBM Plex Mono',size:9},color:'#4c5142',callback:v=>compact.format(v)},grid:{color:'rgba(28,32,24,.08)'}},
+        y:{ticks:{font:{family:'IBM Plex Mono',size:10},color:'#4c5142'},grid:{display:false}}}}});
+  const universe=VIDEOS.filter(v=>v.tags.length).length;
+  $('tagNote').innerHTML=`${map.size} distinct tags across ${universe} tagged videos. Bars show median views among videos carrying each tag.`;
+}
+function buildCatTable(){
+  const map=new Map();
+  VIDEOS.forEach(v=>{const k=v.cat||'?';if(!map.has(k))map.set(k,[]);map.get(k).push(v.views);});
+  const rows=[...map.entries()].map(([id,vs])=>({name:CAT_MAP[id]||('Category '+id),n:vs.length,med:median(vs),tot:vs.reduce((a,b)=>a+b,0)}))
+    .sort((a,b)=>b.n-a.n);
+  $('catTbl').innerHTML=`<table class="mini"><thead><tr><th>Category</th><th>Videos</th><th>Share</th><th>Median views</th><th>Total views</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td>${r.n}</td><td>${fmt1.format(r.n/VIDEOS.length*100)}%</td><td>${compact.format(r.med)}</td><td>${compact.format(r.tot)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function buildCaptions(){
+  const cap=VIDEOS.filter(v=>v.caption), uncap=VIDEOS.filter(v=>!v.caption);
+  const hd=VIDEOS.filter(v=>v.definition==='hd');
+  const synth=VIDEOS.filter(v=>v.synthetic).length;
+  $('capStats').innerHTML=[
+    ['Captioned',fmt1.format(cap.length/VIDEOS.length*100)+'%',''],
+    ['HD',fmt1.format(hd.length/VIDEOS.length*100)+'%',''],
+    ['Median views, captioned',cap.length?compact.format(median(cap.map(v=>v.views))):'—','accent'],
+    ['Median views, no captions',uncap.length?compact.format(median(uncap.map(v=>v.views))):'—',''],
+    ['AI / synthetic flagged',synth?fmt.format(synth):'none',synth?'brass':'']
+  ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
+  let note='';
+  if(cap.length&&uncap.length){
+    const cm=median(cap.map(v=>v.views)),um=median(uncap.map(v=>v.views));
+    const pct=um>0?(cm-um)/um*100:0;
+    note=`Captioned videos run a median <strong>${fmt1.format(Math.abs(pct))}% ${pct>=0?'higher':'lower'}</strong> in views than uncaptioned ones. Correlational, not proof captions cause reach, but a point in favor of captioning.`;
+  } else if(!cap.length){ note='No videos report a caption track. Adding captions would help accessibility and search discoverability.'; }
+  else { note='Every fetched video reports a caption track.'; }
+  $('capNote').innerHTML=note;
+}
+function buildTopics(){
+  let html='';
+  if(CH_TOPICS.length) html+=`<div class="chip-head">Inferred topics</div><div class="chips">${CH_TOPICS.map(t=>`<span class="chip topic">${escapeHtml(t)}</span>`).join('')}</div>`;
+  if(CH_KEYWORDS.length) html+=`<div class="chip-head">Channel keywords</div><div class="chips">${CH_KEYWORDS.slice(0,40).map(k=>`<span class="chip">${escapeHtml(k)}</span>`).join('')}</div>`;
+  if(!html) html='<p class="secnote">No channel topics or keywords are exposed for this channel.</p>';
+  $('topicWrap').innerHTML=html;
+}
+
 /* ---------- exports ---------- */
 function exportCsv(){
   readEcon();
-  const head=['rank','title','type','duration_sec','views','views_per_day','est_revenue_usd','est_cost_usd','est_profit_usd','likes','comments','published','url'];
-  const rows=[...VIDEOS].sort((a,b)=>b.views-a.views).map((v,i)=>[i+1,'"'+v.title.replace(/"/g,'""')+'"',isShort(v)?'short':'long',v.dur,v.views,Math.round(v.perday),revOf(v).toFixed(2),costOf(v).toFixed(2),profitOf(v).toFixed(2),v.likes??'',v.comments??'',v.date,'https://youtu.be/'+v.id].join(','));
+  const head=['rank','title','content_type','category','made_for_kids','captioned','definition','synthetic','duration_sec','views','views_per_day','est_revenue_usd','est_cost_usd','est_profit_usd','likes','comments','published','url','tags'];
+  const rows=[...VIDEOS].sort((a,b)=>b.views-a.views).map((v,i)=>[i+1,'"'+v.title.replace(/"/g,'""')+'"',vtype(v),'"'+(CAT_MAP[v.cat]||v.cat||'').replace(/"/g,'""')+'"',v.kids?'yes':'no',v.caption?'yes':'no',v.definition||'',v.synthetic?'yes':'no',v.dur,v.views,Math.round(v.perday),revOf(v).toFixed(2),costOf(v).toFixed(2),profitOf(v).toFixed(2),v.likes??'',v.comments??'',v.date,'https://youtu.be/'+v.id,'"'+v.tags.join('; ').replace(/"/g,'""')+'"'].join(','));
   download(new Blob([head.join(',')+'\n'+rows.join('\n')],{type:'text/csv'}),slug()+'_views.csv');
 }
 function saveSnapshot(){
-  const snap={channel:CH_NAME,channelId:CH_ID,takenAt:new Date().toISOString(),subscribers:CH_SUBS,videoCount:VIDEOS.length,
-    videos:VIDEOS.map(v=>({id:v.id,title:v.title,date:v.date,views:v.views,dur:v.dur,likes:v.likes,comments:v.comments}))};
+  const snap={channel:CH_NAME,channelId:CH_ID,created:CH_CREATED,takenAt:new Date().toISOString(),subscribers:CH_SUBS,videoCount:VIDEOS.length,
+    videos:VIDEOS.map(v=>({id:v.id,title:v.title,date:v.date,views:v.views,dur:v.dur,kids:v.kids,likes:v.likes,comments:v.comments}))};
   download(new Blob([JSON.stringify(snap,null,2)],{type:'application/json'}),slug()+'_snapshot_'+new Date().toISOString().slice(0,10)+'.json');
 }
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);}
@@ -659,8 +836,10 @@ function buildPrintSheet(){
   const gross=VIDEOS.reduce((a,v)=>a+revOf(v),0);
   const profit=gross-VIDEOS.reduce((a,v)=>a+costOf(v),0);
   const vcls=$('verdict').className.replace('verdict','').trim();
+  const ageY=channelAgeYears();
   const stats=[
     ['Videos',fmt.format(VIDEOS.length)],
+    ['Channel age',ageY!=null?(ageY<1?Math.round(ageY*12)+' mo':fmt1.format(ageY)+' yr'):'—'],
     ['Subscribers',CH_SUBS!=null?compact.format(CH_SUBS):'hidden'],
     ['Subs / video',CH_SUBS!=null?fmt.format(Math.round(CH_SUBS/VIDEOS.length)):'—'],
     ['Total views',compact.format(totalViews)],
@@ -686,11 +865,12 @@ function buildPrintSheet(){
 
 /* ---------- tabs ---------- */
 function showTab(which){
-  const map={trends:['tabTrends','paneTrends'],catalog:['tabCatalog','paneCatalog'],revenue:['tabRevenue','paneRevenue'],track:['tabTrack','paneTrack']};
+  const map={trends:['tabTrends','paneTrends'],catalog:['tabCatalog','paneCatalog'],content:['tabContent','paneContent'],revenue:['tabRevenue','paneRevenue'],track:['tabTrack','paneTrack']};
   Object.values(map).forEach(([t,p])=>{$(t).classList.remove('active');$(p).classList.remove('active');});
   $(map[which][0]).classList.add('active'); $(map[which][1]).classList.add('active');
   if(which==='trends'){ if(!trendsDrawn) drawTrends(); else {VEL&&VEL.resize();CAD&&CAD.resize();ENG&&ENG.resize();} }
   if(which==='catalog'){ CHART&&CHART.resize(); }
+  if(which==='content'){ if(!contentDrawn) renderContent(); else {TAG&&TAG.resize();} }
   if(which==='revenue'){ if(!revDrawn){renderRevenue();revDrawn=true;} else {REV&&REV.resize();} }
 }
 
@@ -700,6 +880,7 @@ $('key').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
 $('chan').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
 $('tabTrends').addEventListener('click',()=>showTab('trends'));
 $('tabCatalog').addEventListener('click',()=>showTab('catalog'));
+$('tabContent').addEventListener('click',()=>showTab('content'));
 $('tabRevenue').addEventListener('click',()=>showTab('revenue'));
 $('tabTrack').addEventListener('click',()=>showTab('track'));
 $('sortDate').addEventListener('click',()=>{SORT_MODE='date';$('sortDate').classList.add('active');$('sortViews').classList.remove('active');drawChart();});
@@ -708,11 +889,11 @@ $('csv').addEventListener('click',exportCsv);
 $('printBtn').addEventListener('click',buildPrintSheet);
 $('saveSnap').addEventListener('click',saveSnapshot);
 $('loadSnap').addEventListener('change',e=>{if(e.target.files[0])compareSnapshot(e.target.files[0]);});
-['rpmLong','rpmShort','shortMax','costLong','costShort'].forEach(id=>$(id).addEventListener('input',()=>{if(VIDEOS.length)renderRevenue();}));
+['rpmLong','rpmShort','shortMax','costLong','costShort'].forEach(id=>$(id).addEventListener('input',()=>{if(id==='rpmLong')rpmTouched=true;if(VIDEOS.length)renderRevenue();}));
 document.querySelectorAll('.preset-row button').forEach(b=>b.addEventListener('click',()=>{$('rpmLong').value=parseFloat(b.dataset.rpml).toFixed(2);if(VIDEOS.length)renderRevenue();}));
 $('tbl').querySelectorAll('th').forEach(th=>{
   th.addEventListener('click',()=>{
-    const k=th.dataset.k; if(k==='rank')return;
+    const k=th.dataset.k; if(!k||k==='rank')return;
     if(TBL_SORT.k===k)TBL_SORT.dir*=-1; else {TBL_SORT.k=k;TBL_SORT.dir=(k==='title')?1:-1;}
     $('tbl').querySelectorAll('th .arr').forEach(a=>a.remove());
     const arr=document.createElement('span');arr.className='arr';arr.textContent=TBL_SORT.dir<0?' ▾':' ▴';th.appendChild(arr);
