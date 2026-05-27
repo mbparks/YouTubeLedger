@@ -60,6 +60,9 @@
   .verdict.up .vhead{color:var(--up);} .verdict.down .vhead{color:var(--down);} .verdict.flat .vhead{color:var(--flat);}
   .verdict.dormant{border-style:dashed;} .verdict.dormant .arrow{color:var(--ink-soft);} .verdict.dormant .vhead{color:var(--ink-soft);}
   .verdict p{margin:0 0 8px;font-size:15px;color:var(--ink);max-width:64ch;} .verdict .figs{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  table.sigtbl td.dir{font-weight:600;white-space:nowrap;} table.sigtbl td.dir.up{color:var(--up);} table.sigtbl td.dir.down{color:var(--down);} table.sigtbl td.dir.flat{color:var(--flat);}
+  table.sigtbl tr.na td{color:var(--ink-soft);font-style:italic;}
+  table.sigtbl td:nth-child(4){font-family:"IBM Plex Mono",monospace;font-size:11.5px;text-align:left;}
   h3.sec{font-size:22px;font-weight:600;margin:34px 0 4px;font-style:italic;}
   .secnote{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5;max-width:74ch;}
   .chart-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;} .chart-head h3{font-size:22px;font-weight:600;margin:0;font-style:italic;}
@@ -187,6 +190,8 @@
       <div class="stats" id="stats"></div>
       <div class="verdict" id="verdict"><div class="arrow" id="vArrow">→</div>
         <div class="vbody"><h3 class="vhead" id="vHead"></h3><p id="vText"></p><div class="figs" id="vFigs"></div></div></div>
+      <p class="secnote" style="margin:-14px 0 8px;">Sub-signals behind the verdict. Each compares the newest third of the catalog against the oldest; the blend weights them into the headline above.</p>
+      <div id="subSignals"></div>
       <h3 class="sec">Per-video reach over time</h3>
       <p class="secnote">Each dot is one video, placed by publish date. The y-axis is views ÷ days online (a "views-per-day" velocity), which removes the unfair advantage older videos have from simply being up longer. Dashed line = long-run fitted trend; solid line = 3-month rolling average. Hollow dots are videos under 30 days old, shown but excluded from the trend fit.</p>
       <div class="chart-frame"><div class="chart-fixed"><canvas id="velChart"></canvas></div></div>
@@ -286,10 +291,10 @@
         <div id="diffOut"></div></div>
     </div>
 
-    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable, which is why the Content tab reconciles the fetched catalog against YouTube's all-time totals. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed); livestreams and premieres are detected from live timestamps and counted under the long-form RPM. Tags are uploader-set and may be sparse or absent; tag-to-views and caption-to-views figures are correlational, not causal. The country-based RPM default is a coarse geography guess. Made-for-kids videos are flagged but still estimated at full RPM, so revenue for those runs high. The momentum verdict checks posting cadence and recency (reading as "dormant" when a channel has gone quiet) and compares median lifetime views among matured uploads. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
+    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable, which is why the Content tab reconciles the fetched catalog against YouTube's all-time totals. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed); livestreams and premieres are detected from live timestamps and counted under the long-form RPM. Tags are uploader-set and may be sparse or absent; tag-to-views and caption-to-views figures are correlational, not causal. The country-based RPM default is a coarse geography guess. Made-for-kids videos are flagged but still estimated at full RPM, so revenue for those runs high. The momentum verdict blends four recent-versus-older signals (reach, like rate, comment rate, posting cadence), guards the reach component against content-format shifts, and reads as "dormant" when a channel has gone quiet; like and comment rates are used because, as ratios, they are far less age-biased than raw views. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
   </section>
 
-  <footer>View Ledger v8 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
+  <footer>View Ledger v9 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
 </div>
 <div id="printSheet"></div>
 
@@ -466,39 +471,95 @@ function render(){
   $('results').style.display='block'; $('results').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+function cohortThirds(arr){const n=arr.length,third=Math.max(1,Math.floor(n/3));return {oldC:arr.slice(0,third),newC:arr.slice(n-third),third};}
+function classify(pct,band){return pct>band?'up':pct<-band?'down':'flat';}
+
+// --- the four momentum sub-signals, each measured recent-third vs oldest-third ---
+function reachSignal(){
+  let set=VIDEOS.filter(v=>daysOnline(v.date)>=90),floor='90';
+  if(set.length<6){set=VIDEOS.filter(v=>daysOnline(v.date)>=30);floor='30';}
+  if(set.length<6){set=VIDEOS;floor='0';}
+  // content-type guard: if the format mix shifted between old and new cohorts, raw views aren't comparable.
+  const {oldC,newC}=cohortThirds(set);
+  const shortShare=g=>g.filter(v=>vtype(v)==='short').length/g.length;
+  let confound=Math.abs(shortShare(newC)-shortShare(oldC))>0.34;
+  let used=set, note='';
+  if(confound){
+    const std=set.filter(v=>vtype(v)==='standard');
+    if(std.length>=6){used=std;note='format mix shifted, so this compares standard uploads only';confound=false;}
+    else note='format mix shifted (Shorts share changed), so this views read is confounded';
+  }
+  const {oldC:o,newC:nw}=cohortThirds(used);
+  const om=median(o.map(v=>v.views)),nm=median(nw.map(v=>v.views));
+  const pct=om>0?(nm-om)/om*100:0;
+  return {key:'reach',label:'Reach (views)',status:classify(pct,20),pct,
+    detail:`${compact.format(om)} → ${compact.format(nm)} median`,floor,confound,note};
+}
+function rateSignal(key,label,getRate,unit){
+  const set=VIDEOS.filter(v=>daysOnline(v.date)>=30&&v.views>0&&getRate(v)!=null);
+  if(set.length<6) return {key,label,status:'na'};
+  const {oldC,newC}=cohortThirds(set);
+  const om=median(oldC.map(getRate)),nm=median(newC.map(getRate));
+  const pct=om>0?(nm-om)/om*100:0;
+  return {key,label,status:classify(pct,15),pct,detail:`${fmt1.format(om)}${unit} → ${fmt1.format(nm)}${unit} median`};
+}
+function cadenceSignal(){
+  const dates=VIDEOS.map(v=>new Date(v.date).getTime()).sort((a,b)=>a-b);
+  if(dates.length<9) return {key:'cadence',label:'Cadence',status:'na'};
+  let gaps=[];for(let i=1;i<dates.length;i++)gaps.push((dates[i]-dates[i-1])/DAY);
+  const t=Math.max(1,Math.floor(gaps.length/3));
+  const oldG=median(gaps.slice(0,t)),newG=median(gaps.slice(gaps.length-t));
+  const pct=oldG>0?(oldG-newG)/oldG*100:0; // shorter recent gap => speeding up => positive
+  return {key:'cadence',label:'Cadence (pace)',status:classify(pct,20),pct,
+    detail:`${gapShort(oldG)} → ${gapShort(newG)} between posts`};
+}
+
 function computeVerdict(){
   const act=activityStatus();
   const cadencePhrase=act.medGap!=null?cadenceStr(act.medGap):'irregularly';
-  // reach comparison: prefer videos >=90d (mostly past the steep decay), fall back as catalog shrinks
-  let set=VIDEOS.filter(v=>daysOnline(v.date)>=90), floorLabel='90';
-  if(set.length<6){set=VIDEOS.filter(v=>daysOnline(v.date)>=30);floorLabel='30';}
-  if(set.length<6){set=VIDEOS;floorLabel='0';}
-  const n=set.length, third=Math.max(1,Math.floor(n/3));
-  const oldC=set.slice(0,third), newC=set.slice(n-third);
-  // compare median TOTAL lifetime views among matured videos. views/day is unusable here:
-  // newer videos divide by fewer days and look inflated even when performance is flat.
-  const oldViews=median(oldC.map(v=>v.views)), newViews=median(newC.map(v=>v.views));
-  const pct=oldViews>0?(newViews-oldViews)/oldViews*100:0;
-  const dir=pct>=0?'up':'down';
-  const reach=pct>20?'up':pct<-20?'down':'flat';
-  const reachLine=`Among videos at least ${floorLabel} days old, the newest cohort's median reach is <strong>${fmt1.format(Math.abs(pct))}% ${dir}</strong> (${compact.format(oldViews)} → ${compact.format(newViews)} views) against the oldest.`;
+  const reach=reachSignal();
+  const likeS=rateSignal('like','Like rate',v=>v.likes!=null?v.likes/v.views*100:null,'%');
+  const commS=rateSignal('comment','Comment rate',v=>v.comments!=null?v.comments/v.views*100:null,'%');
+  const cadS=cadenceSignal();
+  const signals=[reach,commS,likeS,cadS];
 
+  // weights; reach is primary but downweighted when format-confounded
+  const W={reach:reach.confound?0.18:0.35,comment:0.25,like:0.20,cadence:0.20};
+  const val={up:1,flat:0,down:-1};
+  let wsum=0,score=0;
+  signals.forEach(s=>{if(s.status&&s.status!=='na'){const w=W[s.key]||0;wsum+=w;score+=w*val[s.status];}});
+  score=wsum>0?score/wsum:0;
+  const blend=score>0.25?'up':score<-0.25?'down':'flat';
+
+  // headline (dormancy hard-overrides the blend)
   const el=$('verdict'); let cls,head,arrow,text;
+  const ups=signals.filter(s=>s.status==='up'), downs=signals.filter(s=>s.status==='down');
+  const listMovers=arr=>arr.map(s=>`${s.label.toLowerCase()} ${s.pct>=0?'+':''}${fmt1.format(s.pct)}%`).join(', ');
   if(act.status==='dormant'){
-    cls='dormant'; arrow='‖'; head='Dormant';
-    text=`No new uploads in <strong>${relTime(act.daysSince)}</strong>; the channel usually posts <strong>${cadencePhrase}</strong>, so it looks inactive. A momentum verdict doesn't really apply to a dormant channel. ${reachLine} That describes how the existing catalog is holding up, not a live trend.`;
-  } else if(act.status==='slowing'){
-    head=reach==='up'?'Reaching well, posting slower':reach==='down'?'Winding down':'Slowing down';
-    cls=reach==='down'?'down':'flat'; arrow=reach==='down'?'↘':'→';
-    text=`Posting has slowed: <strong>${relTime(act.daysSince)}</strong> since the last upload, versus usually <strong>${cadencePhrase}</strong>. ${reachLine}`;
+    cls='dormant';arrow='‖';head='Dormant';
+    text=`No new uploads in <strong>${relTime(act.daysSince)}</strong>; the channel usually posts <strong>${cadencePhrase}</strong>, so it reads as inactive. The signals below describe how the existing catalog is holding up, not a live trend.`;
   } else {
-    if(reach==='up'){head='Gaining momentum';arrow='↗';cls='up';}
-    else if(reach==='down'){head='Cooling off';arrow='↘';cls='down';}
-    else{head='Holding steady';arrow='→';cls='flat';}
-    text=`Posting <strong>${cadencePhrase}</strong>, last upload <strong>${relTime(act.daysSince)}</strong> ago. ${reachLine}`;
+    if(blend==='up'){head='Heating up';arrow='↗';cls='up';}
+    else if(blend==='down'){head='Cooling down';arrow='↘';cls='down';}
+    else{head='Stagnant';arrow='→';cls='flat';}
+    const active=signals.filter(s=>s.status&&s.status!=='na').length;
+    const parts=[];
+    if(ups.length) parts.push(`rising on ${listMovers(ups)}`);
+    if(downs.length) parts.push(`falling on ${listMovers(downs)}`);
+    text=`Blended from ${active} signal${active===1?'':'s'}: ${parts.length?parts.join('; '):'all signals flat'}. Posting ${cadencePhrase}, last upload ${relTime(act.daysSince)} ago.`;
   }
   el.className='verdict '+cls; $('vArrow').textContent=arrow; $('vHead').textContent=head; $('vText').innerHTML=text;
-  $('vFigs').textContent=`cohort ${third} videos each, comparing median lifetime views among matured uploads · for true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read`;
+  $('vFigs').textContent=`reach uses median lifetime views among matured uploads; like and comment rates and cadence are recent-third vs oldest-third · ratios are far less age-biased than raw views · the Tracking tab's snapshot comparison remains the unbiased read of true growth`;
+
+  // sub-signal table
+  const arrowOf=s=>s.status==='up'?'↗':s.status==='down'?'↘':s.status==='flat'?'→':'·';
+  const wordOf=s=>{if(s.status==='na')return 'no data';if(s.key==='cadence')return s.status==='up'?'faster':s.status==='down'?'slower':'steady';return s.status==='up'?'rising':s.status==='down'?'falling':'flat';};
+  const rows=signals.map(s=>{
+    if(s.status==='na') return `<tr class="na"><td>${s.label}</td><td>·</td><td colspan="2">not enough data, excluded</td><td>—</td></tr>`;
+    const w=Math.round((W[s.key]/ (wsum||1))*100);
+    return `<tr><td>${s.label}</td><td class="dir ${s.status}">${arrowOf(s)} ${wordOf(s)}</td><td class="num">${s.pct>=0?'+':''}${fmt1.format(s.pct)}%</td><td>${s.detail}${s.note?` <span style="color:var(--brass-deep)">(${s.note})</span>`:''}</td><td class="num">${w}%</td></tr>`;
+  }).join('');
+  $('subSignals').innerHTML=`<table class="mini sigtbl"><thead><tr><th>Signal</th><th>Trend</th><th>Change</th><th>Recent vs older</th><th>Weight</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function rollingLine(items){

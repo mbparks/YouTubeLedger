@@ -44,11 +44,21 @@ The tool resolves the channel, walks its uploads playlist, and batch-fetches sta
 
 ### Trends
 
-The momentum verdict runs in two stages. First it reads activity: it measures days since the last upload and the median gap between uploads, then flags the channel as dormant when the silence runs past roughly 2.5 times its normal cadence (with a six-month floor), or slowing at about 1.5 times. A dormant channel reads "Dormant," never "Gaining momentum."
+The momentum verdict is a single blended headline (Heating up, Stagnant, Cooling down, or Dormant) with the sub-signals that produced it shown in a table beneath.
 
-Second, for active channels, it gauges reach by comparing the newest third of the catalog against the oldest third by median lifetime views, restricted to videos at least 90 days old. It deliberately does not compare views-per-day across age cohorts, because views are front-loaded and then taper, so a newer video divided by fewer days looks inflated even when it performed no better than an older one. Comparing total lifetime views among matured videos sidesteps that bias.
+First comes an activity gate. The tool measures days since the last upload and the median gap between uploads, then flags the channel as dormant when the silence runs past roughly 2.5 times its normal cadence (with a six-month floor). A dormant channel reads "Dormant" regardless of anything else, since a trend verdict is meaningless for an inactive channel.
 
-The per-video reach chart still plots each video by publish date against its views-per-day on a logarithmic axis, with a dashed long-run trend line and a solid 3-month rolling average, because the bias is visible and harmless there. Videos under 30 days old appear as hollow dots and are excluded from the trend fit. The cohort table, cadence chart (with typical gap, last upload, and longest silence), and engagement chart round out the picture.
+For active channels, the headline blends four independent signals, each measured as the newest third of the catalog versus the oldest third:
+
+- **Reach.** Median lifetime views, newest versus oldest, restricted to videos at least 90 days old. This is the primary signal (35 percent weight). It deliberately does not compare views-per-day across age cohorts, because views are front-loaded and then taper, so a newer video divided by fewer days looks inflated even when it performed no better. Comparing total lifetime views among matured videos sidesteps that bias.
+- **Comment rate** (25 percent) and **like rate** (20 percent). Engagement as a share of views, recent versus older. These ratios are far less age-confounded than raw views, since a video's like or comment rate stabilizes within weeks while its view count keeps drifting, which makes their trend a cleaner read of momentum. A rising comment rate often warms before view growth shows up, so this is where an early turnaround appears first.
+- **Cadence** (20 percent). Whether the gap between uploads is shrinking or widening, a pure effort signal that is completely age-independent.
+
+Each signal is scored up, flat, or down, then weighted into a blend that maps to the headline. Signals without enough data drop out and the remaining weights renormalize. The sub-signal table shows each one's direction, percentage change, recent-versus-older figures, and weight, so the headline is never a black box: a channel cooling on views but heating on engagement is visible at a glance.
+
+A content-format guard protects the reach signal. If the newest cohort's mix of Standard, Shorts, and livestreams has shifted substantially from the oldest (a Shorts pivot, for instance), raw views are no longer comparable, because Shorts pull inflated view counts. The guard recomputes reach on standard uploads only when there are enough of them, or otherwise downweights the reach signal and labels it confounded, so a format change cannot masquerade as genuine growth.
+
+The per-video reach chart still plots each video by publish date against its views-per-day on a logarithmic axis, with a dashed long-run trend line and a solid 3-month rolling average, because the age bias is visible and harmless there. Videos under 30 days old appear as hollow dots and are excluded from the trend fit. The cohort table, cadence chart (with typical gap, last upload, and longest silence), and engagement chart round out the picture.
 
 ### Catalog
 
@@ -88,7 +98,10 @@ The tool reports views and subscribers gained, the daily rates, the marginal sub
 | --- | --- |
 | Views-per-day | Lifetime views divided by days since publish |
 | Activity status | Days since last upload versus the channel's median posting gap |
-| Momentum (reach) | Median lifetime views of the newest third versus the oldest third, among videos at least 90 days old |
+| Momentum verdict | Weighted blend of the four signals below, gated by activity status |
+| Reach signal | Median lifetime views, newest third versus oldest, videos at least 90 days old (weight 35 percent) |
+| Comment / like rate signals | Median engagement as a share of views, recent versus older (weight 25 / 20 percent) |
+| Cadence signal | Change in the gap between uploads, recent versus older (weight 20 percent) |
 | Channel age | Time since the channel's creation date |
 | Views per year | Total catalog views divided by channel age |
 | Subs per video (cumulative) | Total subscribers divided by total uploads |
@@ -109,6 +122,7 @@ These are structural to the public API, not bugs.
 - **Shorts detection is a duration heuristic.** There is no official "is a Short" flag in the API. YouTube now allows Shorts up to roughly three minutes, so raise the cutoff (for example to 180 seconds) if a channel posts longer Shorts. Note also that YouTube changed Shorts view counting on March 31, 2025, so a Shorts view now counts each play or replay with no minimum watch time, which inflates Shorts views relative to long-form.
 - **Livestream detection** keys off live timestamps and so also catches premieres. Concurrent live viewership is not retrievable after a broadcast ends.
 - **Tag and caption correlations are not causal.** They describe what high-performing videos happen to share, not what made them perform.
+- **The momentum verdict is still a single snapshot.** The ratio signals (like and comment rate) carry slight age drift, and the blend weights are a transparent judgment call rather than science, which is why they are shown rather than hidden. The Tracking tab's two-snapshot comparison remains the only truly unbiased read of growth.
 - **Dislikes are not available.** YouTube made `dislikeCount` private in December 2021.
 
 ## Privacy
@@ -136,6 +150,7 @@ README.md           This file
 
 ## Changelog
 
+- **v9.** Reworked the momentum verdict into a single blended headline backed by four independent sub-signals (reach, comment rate, like rate, and posting cadence), each shown with its direction, change, and weight. Added a content-format guard that stops a Shorts pivot from reading as genuine growth.
 - **v8.** Added the Content tab: tag-to-views analysis, performance by content type, category mix, caption and quality coverage, channel-record reconciliation, and channel topics and keywords. Added a country-driven default RPM, livestream and synthetic-media detection, and richer CSV export.
 - **v7.** Three no-extra-cost additions from data already fetched: channel age and views per year, video thumbnails and channel avatar, and a made-for-kids flag feeding the revenue estimate.
 - **v6.** Reworked the momentum verdict to detect dormant and slowing channels from posting cadence, and rebased the reach comparison on median lifetime views to remove the views-per-day age bias that made dormant channels read as trending up.
