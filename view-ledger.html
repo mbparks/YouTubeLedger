@@ -57,6 +57,7 @@
   .verdict.up .arrow{color:var(--up);} .verdict.down .arrow{color:var(--down);} .verdict.flat .arrow{color:var(--flat);}
   .verdict .vbody{flex:1;min-width:260px;} .verdict .vhead{font-size:28px;font-weight:900;letter-spacing:-.01em;margin:0 0 6px;}
   .verdict.up .vhead{color:var(--up);} .verdict.down .vhead{color:var(--down);} .verdict.flat .vhead{color:var(--flat);}
+  .verdict.dormant{border-style:dashed;} .verdict.dormant .arrow{color:var(--ink-soft);} .verdict.dormant .vhead{color:var(--ink-soft);}
   .verdict p{margin:0 0 8px;font-size:15px;color:var(--ink);max-width:64ch;} .verdict .figs{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);margin-top:6px;}
   h3.sec{font-size:22px;font-weight:600;margin:34px 0 4px;font-style:italic;}
   .secnote{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5;max-width:74ch;}
@@ -117,7 +118,7 @@
     #printSheet .ps-date{font-family:"IBM Plex Mono",monospace;font-size:10px;color:#4c5142;border-bottom:2px solid #1c2018;padding-bottom:8px;margin-bottom:12px;}
     #printSheet .ps-verdict{border:1.5px solid #1c2018;padding:12px 14px;margin-bottom:12px;}
     #printSheet .ps-verdict .h{font-size:18px;font-weight:900;margin:0 0 3px;}
-    #printSheet .ps-verdict.up .h{color:#2e7d4f;} #printSheet .ps-verdict.down .h{color:#a23b22;} #printSheet .ps-verdict.flat .h{color:#6f6a4f;}
+    #printSheet .ps-verdict.up .h{color:#2e7d4f;} #printSheet .ps-verdict.down .h{color:#a23b22;} #printSheet .ps-verdict.flat .h{color:#6f6a4f;} #printSheet .ps-verdict.dormant .h{color:#4c5142;}
     #printSheet .ps-verdict p{margin:0;font-size:12px;}
     #printSheet .ps-stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid #1c2018;margin-bottom:12px;}
     #printSheet .ps-stats .s{flex:1;min-width:78px;padding:8px 9px;border-right:1px solid #bcc1a3;} #printSheet .ps-stats .s:last-child{border-right:none;}
@@ -186,6 +187,7 @@
       <h3 class="sec">Upload cadence</h3>
       <p class="secnote">Videos published per month. Pacing often explains view swings as much as the videos themselves.</p>
       <div class="chart-frame"><div class="chart-fixed"><canvas id="cadChart"></canvas></div></div>
+      <p class="secnote" id="cadNote" style="margin-top:12px;"></p>
       <h3 class="sec">Engagement rate over time</h3>
       <p class="secnote">Likes as a percentage of views, per video. The solid line is a 3-month rolling average. Rising engagement on flat views can be an early signal of a warming audience. Videos with hidden likes are skipped.</p>
       <div class="chart-frame"><div class="chart-fixed"><canvas id="engChart"></canvas></div></div>
@@ -245,10 +247,10 @@
         <div id="diffOut"></div></div>
     </div>
 
-    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed). Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
+    <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed). The momentum verdict checks posting cadence and recency (reading as "dormant" when a channel has gone quiet) and compares median lifetime views among matured uploads. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
   </section>
 
-  <footer>View Ledger v5 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
+  <footer>View Ledger v6 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
 </div>
 <div id="printSheet"></div>
 
@@ -281,6 +283,18 @@ function isShort(v){return v.dur>0 && v.dur<=SHORT_MAX;}
 function revOf(v){return v.views*(isShort(v)?RPM_SHORT:RPM_LONG)/1000;}
 function costOf(v){return isShort(v)?COST_SHORT:COST_LONG;}
 function profitOf(v){return revOf(v)-costOf(v);}
+function relTime(days){if(days<1)return 'today';if(days<14)return Math.round(days)+' days';if(days<60)return Math.round(days/7)+' weeks';if(days<365)return Math.round(days/30.4)+' months';return fmt1.format(days/365)+' years';}
+function cadenceStr(g){if(g==null)return 'irregularly';if(g<1.5)return 'about daily';if(g<14)return 'every '+Math.round(g)+' days';if(g<60)return 'every '+Math.round(g/7)+' weeks';if(g<400)return 'every '+Math.round(g/30.4)+' months';return 'about yearly';}
+function gapShort(g){if(g==null)return '—';if(g<14)return '~'+Math.round(g)+' days';if(g<60)return '~'+Math.round(g/7)+' wk';if(g<400)return '~'+Math.round(g/30.4)+' mo';return '~'+fmt1.format(g/365)+' yr';}
+function activityStatus(){
+  const dates=VIDEOS.map(v=>new Date(v.date).getTime()).sort((a,b)=>a-b);
+  const daysSince=(Date.now()-dates[dates.length-1])/DAY;
+  let gaps=[]; for(let i=1;i<dates.length;i++) gaps.push((dates[i]-dates[i-1])/DAY);
+  const medGap=gaps.length?median(gaps):null, maxGap=gaps.length?Math.max(...gaps):null;
+  const dorm=medGap!=null?Math.max(180,2.5*medGap):365, slow=medGap!=null?Math.max(60,1.5*medGap):120;
+  let status='active'; if(daysSince>dorm)status='dormant'; else if(daysSince>slow)status='slowing';
+  return {daysSince,medGap,maxGap,status};
+}
 
 async function api(path){
   const r=await fetch(API+path); const j=await r.json();
@@ -355,16 +369,17 @@ function render(){
   $('chName').textContent=CH_NAME; $('chId').textContent=CH_ID;
   const views=VIDEOS.map(v=>v.views), total=views.reduce((a,b)=>a+b,0);
   const last90=VIDEOS.filter(v=>daysOnline(v.date)<=90).length;
-  const newest=VIDEOS[VIDEOS.length-1];
   const subsPer=CH_SUBS!=null?fmt.format(Math.round(CH_SUBS/VIDEOS.length)):'—';
+  const act=activityStatus();
   $('stats').innerHTML=[
     ['Videos',fmt.format(VIDEOS.length),''],
     ['Subscribers',CH_SUBS!=null?compact.format(CH_SUBS):'hidden','accent'],
     ['Subs / video',subsPer,'accent'],
     ['Total views',compact.format(total),''],
     ['Median views',compact.format(median(views)),''],
-    ['Last 90 days',fmt.format(last90)+' vids',''],
-    ['Newest',new Date(newest.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}),'']
+    ['Last 90 days',fmt.format(last90)+' vids',act.status==='dormant'?'neg':''],
+    ['Cadence',gapShort(act.medGap),''],
+    ['Last upload',relTime(act.daysSince)+' ago',act.status==='dormant'?'neg':'']
   ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
   computeVerdict(); drawChart(); buildTable();
   showTab('trends');
@@ -372,21 +387,38 @@ function render(){
 }
 
 function computeVerdict(){
-  const matured=VIDEOS.filter(v=>daysOnline(v.date)>=30);
-  const set=matured.length>=6?matured:VIDEOS;
+  const act=activityStatus();
+  const cadencePhrase=act.medGap!=null?cadenceStr(act.medGap):'irregularly';
+  // reach comparison: prefer videos >=90d (mostly past the steep decay), fall back as catalog shrinks
+  let set=VIDEOS.filter(v=>daysOnline(v.date)>=90), floorLabel='90';
+  if(set.length<6){set=VIDEOS.filter(v=>daysOnline(v.date)>=30);floorLabel='30';}
+  if(set.length<6){set=VIDEOS;floorLabel='0';}
   const n=set.length, third=Math.max(1,Math.floor(n/3));
   const oldC=set.slice(0,third), newC=set.slice(n-third);
-  const oldVel=median(oldC.map(v=>v.perday)), newVel=median(newC.map(v=>v.perday));
+  // compare median TOTAL lifetime views among matured videos. views/day is unusable here:
+  // newer videos divide by fewer days and look inflated even when performance is flat.
   const oldViews=median(oldC.map(v=>v.views)), newViews=median(newC.map(v=>v.views));
-  const pct=oldVel>0?(newVel-oldVel)/oldVel*100:0;
-  const el=$('verdict'); let cls,head,arrow;
-  if(pct>15){cls='up';head='Gaining momentum';arrow='↗';}
-  else if(pct<-15){cls='down';head='Cooling off';arrow='↘';}
-  else{cls='flat';head='Holding steady';arrow='→';}
-  el.className='verdict '+cls; $('vArrow').textContent=arrow; $('vHead').textContent=head;
+  const pct=oldViews>0?(newViews-oldViews)/oldViews*100:0;
   const dir=pct>=0?'up':'down';
-  $('vText').innerHTML=`Measured by views-per-day, the channel's recent videos are pulling <strong>${fmt1.format(Math.abs(pct))}% ${dir}</strong> against its earliest cohort. Newest videos average <strong>${fmt.format(Math.round(newVel))}</strong> views/day versus <strong>${fmt.format(Math.round(oldVel))}</strong> for the oldest.`;
-  $('vFigs').textContent=`cohort size ${third} videos each · median lifetime views ${compact.format(oldViews)} (old) → ${compact.format(newViews)} (new) · ${matured.length<6?'small catalog: using all videos':'videos under 30 days excluded from this read'}`;
+  const reach=pct>20?'up':pct<-20?'down':'flat';
+  const reachLine=`Among videos at least ${floorLabel} days old, the newest cohort's median reach is <strong>${fmt1.format(Math.abs(pct))}% ${dir}</strong> (${compact.format(oldViews)} → ${compact.format(newViews)} views) against the oldest.`;
+
+  const el=$('verdict'); let cls,head,arrow,text;
+  if(act.status==='dormant'){
+    cls='dormant'; arrow='‖'; head='Dormant';
+    text=`No new uploads in <strong>${relTime(act.daysSince)}</strong>; the channel usually posts <strong>${cadencePhrase}</strong>, so it looks inactive. A momentum verdict doesn't really apply to a dormant channel. ${reachLine} That describes how the existing catalog is holding up, not a live trend.`;
+  } else if(act.status==='slowing'){
+    head=reach==='up'?'Reaching well, posting slower':reach==='down'?'Winding down':'Slowing down';
+    cls=reach==='down'?'down':'flat'; arrow=reach==='down'?'↘':'→';
+    text=`Posting has slowed: <strong>${relTime(act.daysSince)}</strong> since the last upload, versus usually <strong>${cadencePhrase}</strong>. ${reachLine}`;
+  } else {
+    if(reach==='up'){head='Gaining momentum';arrow='↗';cls='up';}
+    else if(reach==='down'){head='Cooling off';arrow='↘';cls='down';}
+    else{head='Holding steady';arrow='→';cls='flat';}
+    text=`Posting <strong>${cadencePhrase}</strong>, last upload <strong>${relTime(act.daysSince)}</strong> ago. ${reachLine}`;
+  }
+  el.className='verdict '+cls; $('vArrow').textContent=arrow; $('vHead').textContent=head; $('vText').innerHTML=text;
+  $('vFigs').textContent=`cohort ${third} videos each, comparing median lifetime views among matured uploads · for true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read`;
 }
 
 function rollingLine(items){
@@ -460,6 +492,8 @@ function drawCadence(){
       tooltip:{backgroundColor:'#1c2018',bodyColor:'#f1eee1',bodyFont:{family:'IBM Plex Mono',size:11.5},padding:10,displayColors:false,callbacks:{label:i=>i.raw+' video'+(i.raw===1?'':'s')}}},
       scales:{x:{ticks:{font:{family:'IBM Plex Mono',size:8.5},color:'#4c5142',maxRotation:90,minRotation:60,autoSkip:true,maxTicksLimit:24},grid:{display:false}},
         y:{beginAtZero:true,ticks:{stepSize:1,font:{family:'IBM Plex Mono',size:10},color:'#4c5142'},grid:{color:'rgba(28,32,24,.08)'}}}}});
+  const act=activityStatus();
+  $('cadNote').innerHTML=`Typical gap between uploads: <strong>${gapShort(act.medGap)}</strong> (${cadenceStr(act.medGap)}). Last upload: <strong>${relTime(act.daysSince)} ago</strong>.`+(act.maxGap!=null?` Longest silence: <strong>${relTime(act.maxGap)}</strong>.`:'')+(act.status==='dormant'?` <span style="color:var(--down)">This channel reads as dormant.</span>`:act.status==='slowing'?` <span style="color:var(--flat)">Posting has slowed recently.</span>`:'');
 }
 
 function drawEngagement(){
