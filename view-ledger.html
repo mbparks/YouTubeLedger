@@ -294,7 +294,7 @@
     <div class="priv">Note · The API returns public uploads only and rounds subscriber counts. Private, unlisted, and deleted videos aren't retrievable, which is why the Content tab reconciles the fetched catalog against YouTube's all-time totals. Shorts detection is a duration heuristic (YouTube allows Shorts up to ~3 min, so raise the cutoff if needed); livestreams and premieres are detected from live timestamps and counted under the long-form RPM. Tags are uploader-set and may be sparse or absent; tag-to-views and caption-to-views figures are correlational, not causal. The country-based RPM default is a coarse geography guess. Made-for-kids videos are flagged but still estimated at full RPM, so revenue for those runs high. The momentum verdict blends four recent-versus-older signals (reach, like rate, comment rate, posting cadence), guards the reach component against content-format shifts, and reads as "dormant" when a channel has gone quiet; like and comment rates are used because, as ratios, they are far less age-biased than raw views. For true period-over-period growth, the Tracking tab's snapshot comparison is the unbiased read. Velocity, rolling averages, engagement, revenue, and profit are derived estimates, not official YouTube Analytics.</div>
   </section>
 
-  <footer>View Ledger v9 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
+  <footer>View Ledger v10 · a Green Shoe Garage Data Co. instrument · data fetched live from Google's YouTube Data API v3 · no analytics, no storage, no tracking of you.</footer>
 </div>
 <div id="printSheet"></div>
 
@@ -313,7 +313,7 @@ $('dateStamp').textContent='Compiled '+new Date().toLocaleDateString('en-US',{ye
 let VIDEOS=[], CH_NAME='', CH_ID='', CH_SUBS=null, CH_CREATED=null, CH_AVATAR='';
 let CH_COUNTRY='', CH_TOTAL_VIEWS=null, CH_VIDEO_COUNT=null, CH_KEYWORDS=[], CH_TOPICS=[], CAT_MAP={}, rpmTouched=false;
 let CHART=null, VEL=null, CAD=null, ENG=null, REV=null, TAG=null;
-let SORT_MODE='date', TBL_SORT={k:'views',dir:-1}, trendsDrawn=false, revDrawn=false, contentDrawn=false;
+let SORT_MODE='date', TBL_SORT={k:'views',dir:-1}, trendsDrawn=false, revDrawn=false, contentDrawn=false, catalogDrawn=false;
 let RPM_LONG=3, RPM_SHORT=0.10, SHORT_MAX=60, COST_LONG=0, COST_SHORT=0;
 const API='https://www.googleapis.com/youtube/v3/';
 
@@ -438,7 +438,7 @@ async function run(){
     }
     VIDEOS.sort((a,b)=>new Date(a.date)-new Date(b.date));
     setStatus(`Done — ${VIDEOS.length} videos counted.`);
-    trendsDrawn=false; revDrawn=false; contentDrawn=false;
+    trendsDrawn=false; revDrawn=false; contentDrawn=false; catalogDrawn=false;
     if(!rpmTouched){const r=rpmForCountry(CH_COUNTRY); if(r!=null) $('rpmLong').value=r.toFixed(2);}
     render();
   }catch(e){ setStatus(e.message||String(e),true); }
@@ -466,7 +466,7 @@ function render(){
     ['Last upload',relTime(act.daysSince)+' ago',act.status==='dormant'?'neg':''],
     ['Made for kids',kids?fmt.format(kids)+' vids':'none','']
   ].map(([l,v,c])=>`<div class="stat"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join('');
-  computeVerdict(); drawChart(); buildTable();
+  computeVerdict(); buildTable();
   showTab('trends');
   $('results').style.display='block'; $('results').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -930,7 +930,7 @@ function showTab(which){
   Object.values(map).forEach(([t,p])=>{$(t).classList.remove('active');$(p).classList.remove('active');});
   $(map[which][0]).classList.add('active'); $(map[which][1]).classList.add('active');
   if(which==='trends'){ if(!trendsDrawn) drawTrends(); else {VEL&&VEL.resize();CAD&&CAD.resize();ENG&&ENG.resize();} }
-  if(which==='catalog'){ CHART&&CHART.resize(); }
+  if(which==='catalog'){ if(!catalogDrawn){drawChart();catalogDrawn=true;} else CHART&&CHART.resize(); }
   if(which==='content'){ if(!contentDrawn) renderContent(); else {TAG&&TAG.resize();} }
   if(which==='revenue'){ if(!revDrawn){renderRevenue();revDrawn=true;} else {REV&&REV.resize();} }
 }
